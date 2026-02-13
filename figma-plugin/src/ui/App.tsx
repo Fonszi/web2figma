@@ -28,7 +28,7 @@ function App() {
   const [phase, setPhase] = useState<ImportPhase>('parsing');
   const [progress, setProgress] = useState(0);
   const [progressMessage, setProgressMessage] = useState('');
-  const [result, setResult] = useState<{ nodeCount: number; tokenCount: number; componentCount: number; styleCount: number } | null>(null);
+  const [result, setResult] = useState<{ nodeCount: number; tokenCount: number; componentCount: number; styleCount: number; sectionCount: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [settings, setSettings] = useState<ImportSettings>(DEFAULT_SETTINGS);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -48,7 +48,7 @@ function App() {
 
         case 'IMPORT_COMPLETE':
           setState('done');
-          setResult({ nodeCount: msg.nodeCount, tokenCount: msg.tokenCount, componentCount: msg.componentCount, styleCount: msg.styleCount });
+          setResult({ nodeCount: msg.nodeCount, tokenCount: msg.tokenCount, componentCount: msg.componentCount, styleCount: msg.styleCount, sectionCount: msg.sectionCount });
           break;
 
         case 'IMPORT_ERROR':
@@ -204,6 +204,12 @@ function App() {
               <span class="stat-value">{result.componentCount}</span>
               <span class="stat-label">Components</span>
             </div>
+            {result.sectionCount > 0 && (
+              <div class="stat">
+                <span class="stat-value">{result.sectionCount}</span>
+                <span class="stat-label">Sections</span>
+              </div>
+            )}
           </div>
           {(() => {
             try {

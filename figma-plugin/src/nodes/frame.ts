@@ -14,9 +14,9 @@ import type { BridgeNode } from '../../../shared/types';
 import type { StyleMap } from '../tokens';
 import { parseCssColor, isTransparent, solidPaint, parseCornerRadii, parseBoxShadow } from './styles';
 
-export function createFrameNode(node: BridgeNode, styleMap?: StyleMap): FrameNode {
+export function createFrameNode(node: BridgeNode, styleMap?: StyleMap, framerName?: string | null): FrameNode {
   const frame = figma.createFrame();
-  frame.name = node.tag;
+  frame.name = framerName || node.tag;
 
   // Size
   frame.resize(

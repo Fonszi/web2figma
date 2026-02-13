@@ -23,7 +23,7 @@ export type UiToSandboxMessage =
 
 export type SandboxToUiMessage =
   | { type: 'IMPORT_PROGRESS'; phase: ImportPhase; progress: number; message: string }
-  | { type: 'IMPORT_COMPLETE'; nodeCount: number; tokenCount: number; componentCount: number; styleCount: number }
+  | { type: 'IMPORT_COMPLETE'; nodeCount: number; tokenCount: number; componentCount: number; styleCount: number; sectionCount: number }
   | { type: 'IMPORT_ERROR'; error: string }
   | { type: 'SETTINGS_LOADED'; settings: ImportSettings };
 
@@ -32,6 +32,7 @@ export type ImportPhase =
   | 'creating-nodes'
   | 'creating-styles'
   | 'creating-components'
+  | 'creating-sections'
   | 'loading-images'
   | 'finalizing';
 
@@ -40,6 +41,7 @@ export const PHASE_LABELS: Record<ImportPhase, string> = {
   'creating-nodes': 'Creating Figma nodes...',
   'creating-styles': 'Creating design tokens...',
   'creating-components': 'Detecting components...',
+  'creating-sections': 'Organizing sections...',
   'loading-images': 'Loading images...',
   finalizing: 'Finalizing import...',
 };

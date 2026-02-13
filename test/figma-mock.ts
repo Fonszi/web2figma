@@ -135,6 +135,19 @@ export interface MockInstanceNode {
   resize: ReturnType<typeof vi.fn>;
 }
 
+export interface MockSectionNode {
+  id: string;
+  type: 'SECTION';
+  name: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  appendChild: ReturnType<typeof vi.fn>;
+  resizeSansConstraints: ReturnType<typeof vi.fn>;
+  children: unknown[];
+}
+
 /** Stores all created mocks for assertions. */
 export const mockStore = {
   paintStyles: [] as MockPaintStyle[],
@@ -148,6 +161,7 @@ export const mockStore = {
   rectangles: [] as MockRectangleNode[],
   components: [] as MockComponentNode[],
   instances: [] as MockInstanceNode[],
+  sections: [] as MockSectionNode[],
 };
 
 function createMockFrame(): MockFrameNode {
@@ -284,6 +298,7 @@ export function setupFigmaMock(): void {
   mockStore.rectangles = [];
   mockStore.components = [];
   mockStore.instances = [];
+  mockStore.sections = [];
 
   const figmaMock = {
     createFrame: vi.fn(() => createMockFrame()),
@@ -293,6 +308,26 @@ export function setupFigmaMock(): void {
     createRectangle: vi.fn(() => createMockRectangle()),
 
     createComponent: vi.fn(() => createMockComponent()),
+
+    createSection: vi.fn(() => {
+      const section: MockSectionNode = {
+        id: nextId(),
+        type: 'SECTION',
+        name: '',
+        x: 0,
+        y: 0,
+        width: 0,
+        height: 0,
+        appendChild: vi.fn(),
+        resizeSansConstraints: vi.fn(function (this: MockSectionNode, w: number, h: number) {
+          this.width = w;
+          this.height = h;
+        }),
+        children: [],
+      };
+      mockStore.sections.push(section);
+      return section;
+    }),
 
     createNodeFromSvg: vi.fn((svg: string) => {
       const frame = createMockFrame();

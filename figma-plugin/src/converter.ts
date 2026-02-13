@@ -27,12 +27,14 @@ import { createImageNode } from './nodes/image';
 import { createVectorNode } from './nodes/vector';
 import { createAllStyles, type StyleMap } from './tokens';
 import { detectComponents, createComponents, createInstanceNode, type ComponentMap } from './components';
+import { enhanceFramerTokens, enhanceFramerComponents, getFramerName, organizeFramerSections } from './framer';
 
 export interface ConvertResult {
   nodeCount: number;
   tokenCount: number;
   componentCount: number;
   styleCount: number;
+  sectionCount: number;
 }
 
 type ProgressCallback = (phase: ImportPhase, progress: number, message: string) => void;
@@ -47,17 +49,28 @@ export async function convertToFigma(
 ): Promise<ConvertResult> {
   onProgress('parsing', 0, 'Preparing import...');
 
+  const isFramer = result.metadata.isFramerSite && settings.framerAwareMode;
+
+  // --- Phase: Enhance tokens for Framer (before style creation) ---
+  const tokens = isFramer ? enhanceFramerTokens(result.tokens) : result.tokens;
+
   // --- Phase: Create design tokens / styles ---
   onProgress('creating-styles', 0, 'Creating design tokens...');
   const styleMap = await createAllStyles(
-    result.tokens,
+    tokens,
     settings,
     (message, progress) => onProgress('creating-styles', progress, message),
   );
 
   // --- Phase: Detect and create components ---
   onProgress('creating-components', 0, 'Detecting components...');
-  const detected = detectComponents(result.rootNode);
+  let detected = detectComponents(result.rootNode);
+
+  // Enhance with Framer component boundaries
+  if (isFramer) {
+    detected = enhanceFramerComponents(detected, result.rootNode);
+  }
+
   onProgress('creating-components', 0.3, `Found ${detected.length} component patterns...`);
 
   const componentMap = await createComponents(
@@ -99,7 +112,16 @@ export async function convertToFigma(
     },
     styleMap,
     componentMap,
+    isFramer,
   );
+
+  // --- Phase: Create Framer sections ---
+  let sectionCount = 0;
+  if (isFramer) {
+    onProgress('creating-sections', 0, 'Organizing Framer sections...');
+    sectionCount = organizeFramerSections(pageFrame, result.rootNode);
+    onProgress('creating-sections', 1, `Created ${sectionCount} sections`);
+  }
 
   // Position the frame at the center of the viewport
   const viewport = figma.viewport.center;
@@ -117,9 +139,10 @@ export async function convertToFigma(
 
   return {
     nodeCount: processedNodes,
-    tokenCount: result.tokens.colors.length + result.tokens.typography.length + result.tokens.effects.length,
+    tokenCount: tokens.colors.length + tokens.typography.length + tokens.effects.length,
     componentCount: componentMap.count,
     styleCount,
+    sectionCount,
   };
 }
 
@@ -135,6 +158,7 @@ async function convertNode(
   onNodeCreated: (count: number) => void,
   styleMap: StyleMap,
   componentMap: ComponentMap,
+  isFramer: boolean = false,
 ): Promise<void> {
   // Skip invisible nodes unless settings say otherwise
   if (!node.visible && !settings.includeHiddenElements) return;
@@ -156,21 +180,26 @@ async function convertNode(
     }
   }
 
+  // Framer-aware layer naming
+  const framerName = isFramer ? getFramerName(node) : null;
+
   let figmaNode: SceneNode;
 
   switch (node.type) {
     case 'text': {
-      figmaNode = await createTextNode(node, styleMap);
+      figmaNode = await createTextNode(node, styleMap, framerName);
       break;
     }
 
     case 'image': {
       figmaNode = await createImageNode(node, nodeId);
+      if (framerName) figmaNode.name = framerName;
       break;
     }
 
     case 'svg': {
       figmaNode = await createVectorNode(node);
+      if (framerName) figmaNode.name = framerName;
       break;
     }
 
@@ -179,7 +208,7 @@ async function convertNode(
     case 'video':
     case 'unknown':
     default: {
-      const frame = createFrameNode(node, styleMap);
+      const frame = createFrameNode(node, styleMap, framerName);
 
       // Recursively convert children
       let childIndex = 0;
@@ -193,6 +222,7 @@ async function convertNode(
           onNodeCreated,
           styleMap,
           componentMap,
+          isFramer,
         );
         childIndex++;
       }

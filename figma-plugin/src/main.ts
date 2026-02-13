@@ -78,7 +78,7 @@ async function handleImport(json: string): Promise<void> {
     const result: ExtractionResult = JSON.parse(json);
     const settings = await loadSettings();
 
-    const { nodeCount, tokenCount, componentCount, styleCount } = await convertToFigma(
+    const { nodeCount, tokenCount, componentCount, styleCount, sectionCount } = await convertToFigma(
       result,
       settings,
       (phase, progress, message) => {
@@ -92,6 +92,7 @@ async function handleImport(json: string): Promise<void> {
       tokenCount,
       componentCount,
       styleCount,
+      sectionCount,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to parse extraction data';

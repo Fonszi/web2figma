@@ -86,9 +86,9 @@ export async function resolveFigmaFont(
   return { family: 'Inter', style: 'Regular' };
 }
 
-export async function createTextNode(node: BridgeNode, styleMap?: StyleMap): Promise<TextNode> {
+export async function createTextNode(node: BridgeNode, styleMap?: StyleMap, framerName?: string | null): Promise<TextNode> {
   const text = figma.createText();
-  text.name = node.text?.slice(0, 40) ?? node.tag;
+  text.name = framerName || node.text?.slice(0, 40) || node.tag;
 
   // Resolve and load font
   const fontFamily = node.styles.fontFamily ?? 'Inter';
