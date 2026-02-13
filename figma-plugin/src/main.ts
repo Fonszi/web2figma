@@ -21,7 +21,8 @@ import { UI_WIDTH, UI_HEIGHT } from '../../shared/constants';
 import type { UiToSandboxMessage, SandboxToUiMessage } from '../../shared/messages';
 import type { ExtractionResult, ImportSettings } from '../../shared/types';
 import { DEFAULT_SETTINGS } from '../../shared/types';
-// import { convertToFigma } from './converter';
+import { convertToFigma } from './converter';
+import { handleImageDataFromUi } from './nodes/image';
 
 figma.showUI(__html__, { width: UI_WIDTH, height: UI_HEIGHT, themeColors: true });
 
@@ -38,26 +39,34 @@ function sendToUi(message: SandboxToUiMessage): void {
   figma.ui.postMessage(message);
 }
 
-figma.ui.onmessage = async (msg: UiToSandboxMessage) => {
+figma.ui.onmessage = async (msg: UiToSandboxMessage & { type: string; nodeId?: string; data?: Uint8Array | null }) => {
   switch (msg.type) {
     case 'START_IMPORT':
-      await handleImport(msg.json);
+      await handleImport((msg as UiToSandboxMessage & { type: 'START_IMPORT' }).json);
       break;
 
     case 'CANCEL_IMPORT':
-      // TODO: implement cancellation
+      // TODO: implement cancellation via AbortController
       break;
 
     case 'UPDATE_SETTINGS': {
       const current = await loadSettings();
-      const updated = { ...current, ...msg.settings };
+      const updated = { ...current, ...(msg as UiToSandboxMessage & { type: 'UPDATE_SETTINGS' }).settings };
       await saveSettings(updated);
       sendToUi({ type: 'SETTINGS_LOADED', settings: updated });
       break;
     }
 
     case 'RESIZE_UI':
-      figma.ui.resize(msg.width, msg.height);
+      figma.ui.resize(
+        (msg as UiToSandboxMessage & { type: 'RESIZE_UI' }).width,
+        (msg as UiToSandboxMessage & { type: 'RESIZE_UI' }).height,
+      );
+      break;
+
+    case 'IMAGE_DATA':
+      // Image data relayed from UI iframe (fetched from URL)
+      handleImageDataFromUi(msg.nodeId ?? '', msg.data ?? null);
       break;
   }
 };
@@ -69,16 +78,20 @@ async function handleImport(json: string): Promise<void> {
     const result: ExtractionResult = JSON.parse(json);
     const settings = await loadSettings();
 
-    // TODO M2: convertToFigma(result, settings, onProgress)
-    // const { nodeCount, tokenCount, componentCount } = await convertToFigma(result, settings, (phase, progress) => {
-    //   sendToUi({ type: 'IMPORT_PROGRESS', phase, progress, message: `${phase}...` });
-    // });
+    const { nodeCount, tokenCount, componentCount, styleCount } = await convertToFigma(
+      result,
+      settings,
+      (phase, progress, message) => {
+        sendToUi({ type: 'IMPORT_PROGRESS', phase, progress, message });
+      },
+    );
 
     sendToUi({
       type: 'IMPORT_COMPLETE',
-      nodeCount: 0,
-      tokenCount: 0,
-      componentCount: 0,
+      nodeCount,
+      tokenCount,
+      componentCount,
+      styleCount,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to parse extraction data';

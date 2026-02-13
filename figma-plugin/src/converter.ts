@@ -1,0 +1,221 @@
+/**
+ * Core converter — recursive BridgeNode → Figma node pipeline.
+ *
+ * Entry point: `convertToFigma(result, settings, onProgress)`
+ *
+ * Walks the BridgeNode tree and creates corresponding Figma nodes:
+ * - frame → FrameNode (with Auto Layout)
+ * - text → TextNode (with font loading)
+ * - image → RectangleNode (with image fill)
+ * - svg → VectorNode (via createNodeFromSvg)
+ * - input → FrameNode (placeholder)
+ * - video → FrameNode (placeholder)
+ *
+ * Related files:
+ * - Node creators: figma-plugin/src/nodes/
+ * - Token creators: figma-plugin/src/tokens/
+ * - Component creators: figma-plugin/src/components/
+ * - Types: shared/types.ts (BridgeNode, ExtractionResult, ImportSettings)
+ * - Messages: shared/messages.ts (ImportPhase)
+ */
+
+import type { ExtractionResult, ImportSettings, BridgeNode } from '../../shared/types';
+import type { ImportPhase } from '../../shared/messages';
+import { createFrameNode } from './nodes/frame';
+import { createTextNode } from './nodes/text';
+import { createImageNode } from './nodes/image';
+import { createVectorNode } from './nodes/vector';
+import { createAllStyles, type StyleMap } from './tokens';
+import { detectComponents, createComponents, createInstanceNode, type ComponentMap } from './components';
+
+export interface ConvertResult {
+  nodeCount: number;
+  tokenCount: number;
+  componentCount: number;
+  styleCount: number;
+}
+
+type ProgressCallback = (phase: ImportPhase, progress: number, message: string) => void;
+
+/**
+ * Convert an ExtractionResult into Figma nodes on the current page.
+ */
+export async function convertToFigma(
+  result: ExtractionResult,
+  settings: ImportSettings,
+  onProgress: ProgressCallback,
+): Promise<ConvertResult> {
+  onProgress('parsing', 0, 'Preparing import...');
+
+  // --- Phase: Create design tokens / styles ---
+  onProgress('creating-styles', 0, 'Creating design tokens...');
+  const styleMap = await createAllStyles(
+    result.tokens,
+    settings,
+    (message, progress) => onProgress('creating-styles', progress, message),
+  );
+
+  // --- Phase: Detect and create components ---
+  onProgress('creating-components', 0, 'Detecting components...');
+  const detected = detectComponents(result.rootNode);
+  onProgress('creating-components', 0.3, `Found ${detected.length} component patterns...`);
+
+  const componentMap = await createComponents(
+    detected,
+    settings,
+    styleMap,
+    (created, total) => {
+      const progress = 0.3 + (created / total) * 0.7;
+      onProgress('creating-components', progress, `Creating component ${created}/${total}...`);
+    },
+  );
+
+  // Count total nodes for progress tracking
+  const totalNodes = countNodes(result.rootNode);
+  let processedNodes = 0;
+
+  // Create a top-level frame for the imported page
+  const pageFrame = figma.createFrame();
+  pageFrame.name = result.metadata.title || `Import from ${new URL(result.url).hostname}`;
+  pageFrame.resize(
+    Math.max(1, result.viewport.width),
+    Math.max(1, result.viewport.height),
+  );
+  pageFrame.fills = [];
+
+  onProgress('creating-nodes', 0, `Creating ${totalNodes} nodes...`);
+
+  // Recursively convert the BridgeNode tree
+  await convertNode(
+    result.rootNode,
+    pageFrame,
+    settings,
+    0,
+    'root',
+    (count) => {
+      processedNodes += count;
+      const progress = Math.min(0.95, processedNodes / totalNodes);
+      onProgress('creating-nodes', progress, `Created ${processedNodes}/${totalNodes} nodes`);
+    },
+    styleMap,
+    componentMap,
+  );
+
+  // Position the frame at the center of the viewport
+  const viewport = figma.viewport.center;
+  pageFrame.x = Math.round(viewport.x - pageFrame.width / 2);
+  pageFrame.y = Math.round(viewport.y - pageFrame.height / 2);
+
+  // Select the created frame
+  figma.currentPage.selection = [pageFrame];
+  figma.viewport.scrollAndZoomIntoView([pageFrame]);
+
+  onProgress('finalizing', 1, 'Done!');
+
+  const styleCount = styleMap.colors.count + styleMap.typography.count
+    + styleMap.effects.count + styleMap.variables.count;
+
+  return {
+    nodeCount: processedNodes,
+    tokenCount: result.tokens.colors.length + result.tokens.typography.length + result.tokens.effects.length,
+    componentCount: componentMap.count,
+    styleCount,
+  };
+}
+
+/**
+ * Recursively convert a BridgeNode and append to parent.
+ */
+async function convertNode(
+  node: BridgeNode,
+  parent: FrameNode,
+  settings: ImportSettings,
+  depth: number,
+  nodeId: string,
+  onNodeCreated: (count: number) => void,
+  styleMap: StyleMap,
+  componentMap: ComponentMap,
+): Promise<void> {
+  // Skip invisible nodes unless settings say otherwise
+  if (!node.visible && !settings.includeHiddenElements) return;
+
+  // Respect max depth
+  if (depth > settings.maxDepth) return;
+
+  // --- Component instance shortcut ---
+  // If this node's hash matches a known component, create an instance instead
+  // of building the entire subtree from scratch. Skip the root node (depth 0).
+  if (depth > 0 && node.componentHash) {
+    const componentNode = componentMap.nodesByHash.get(node.componentHash);
+    if (componentNode) {
+      const instance = createInstanceNode(node, componentNode);
+      parent.appendChild(instance);
+      // Count the entire subtree as processed (skip children)
+      onNodeCreated(countNodes(node));
+      return;
+    }
+  }
+
+  let figmaNode: SceneNode;
+
+  switch (node.type) {
+    case 'text': {
+      figmaNode = await createTextNode(node, styleMap);
+      break;
+    }
+
+    case 'image': {
+      figmaNode = await createImageNode(node, nodeId);
+      break;
+    }
+
+    case 'svg': {
+      figmaNode = await createVectorNode(node);
+      break;
+    }
+
+    case 'frame':
+    case 'input':
+    case 'video':
+    case 'unknown':
+    default: {
+      const frame = createFrameNode(node, styleMap);
+
+      // Recursively convert children
+      let childIndex = 0;
+      for (const child of node.children) {
+        await convertNode(
+          child,
+          frame,
+          settings,
+          depth + 1,
+          `${nodeId}-${childIndex}`,
+          onNodeCreated,
+          styleMap,
+          componentMap,
+        );
+        childIndex++;
+      }
+
+      figmaNode = frame;
+      break;
+    }
+  }
+
+  // Append to parent
+  parent.appendChild(figmaNode);
+  onNodeCreated(1);
+
+  // Yield to Figma UI thread periodically (every 50 nodes) to keep the plugin responsive
+  if (Math.random() < 0.02) {
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  }
+}
+
+function countNodes(node: BridgeNode): number {
+  let count = 1;
+  for (const child of node.children) {
+    count += countNodes(child);
+  }
+  return count;
+}

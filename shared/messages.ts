@@ -23,7 +23,7 @@ export type UiToSandboxMessage =
 
 export type SandboxToUiMessage =
   | { type: 'IMPORT_PROGRESS'; phase: ImportPhase; progress: number; message: string }
-  | { type: 'IMPORT_COMPLETE'; nodeCount: number; tokenCount: number; componentCount: number }
+  | { type: 'IMPORT_COMPLETE'; nodeCount: number; tokenCount: number; componentCount: number; styleCount: number }
   | { type: 'IMPORT_ERROR'; error: string }
   | { type: 'SETTINGS_LOADED'; settings: ImportSettings };
 

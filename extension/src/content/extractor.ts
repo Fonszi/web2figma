@@ -25,13 +25,13 @@
  * - Constants: shared/constants.ts (MAX_NODE_DEPTH, MAX_INLINE_IMAGE_SIZE)
  */
 
-import type { BridgeNode, ExtractionResult, SiteMetadata, ComputedStyles } from '../../../shared/types';
+import type { BridgeNode, ExtractionResult, SiteMetadata, ComputedStyles, DetectedFont } from '../../../shared/types';
 import { MAX_NODE_DEPTH } from '../../../shared/constants';
-// import { analyzeLayout } from './layout-analyzer';
-// import { detectFramerSite, enhanceFramerNode } from './framer-detector';
-// import { collectImageData } from './image-collector';
-// import { scanTokens } from './token-scanner';
-// import { hashComponent } from './component-hasher';
+import { analyzeLayout } from './layout-analyzer';
+import { detectFramerSite, getFramerNodeInfo } from './framer-detector';
+import { collectImageData, collectSvgData } from './image-collector';
+import { scanTokens } from './token-scanner';
+import { hashComponent } from './component-hasher';
 
 /**
  * Extract the full page as a BridgeNode tree.
@@ -41,16 +41,20 @@ export async function extractPage(): Promise<ExtractionResult> {
   const startTime = Date.now();
 
   // Detect site framework (Framer, Webflow, WordPress, generic)
-  // const isFramer = detectFramerSite(document);
+  const framerResult = detectFramerSite(document);
+  const framework = framerResult.isFramerSite ? 'framer' : detectFramework();
 
   // Walk DOM tree from body
-  const rootNode = walkDomNode(document.body, 0);
+  const rootNode = await walkDomNode(document.body, 0);
 
   // Scan for design tokens (colors, typography, effects, CSS variables)
-  // const tokens = scanTokens(document);
+  const tokens = scanTokens(document);
+
+  // Detect fonts used on the page
+  const fonts = detectFonts();
 
   // Collect metadata
-  const metadata = extractMetadata();
+  const metadata = extractMetadata(framerResult.isFramerSite, framerResult.framerProjectId);
 
   return {
     url: window.location.href,
@@ -59,11 +63,11 @@ export async function extractPage(): Promise<ExtractionResult> {
       height: window.innerHeight,
     },
     timestamp: startTime,
-    framework: 'unknown', // TODO: detectFramerSite()
+    framework,
     rootNode,
-    tokens: { colors: [], typography: [], effects: [], variables: [] },
-    components: [],
-    fonts: [],
+    tokens,
+    components: [], // Component detection happens post-extraction via hashes
+    fonts,
     metadata,
   };
 }
@@ -71,30 +75,19 @@ export async function extractPage(): Promise<ExtractionResult> {
 /**
  * Recursively walk a DOM node and create a BridgeNode.
  */
-function walkDomNode(element: Element, depth: number): BridgeNode {
+async function walkDomNode(element: Element, depth: number): Promise<BridgeNode> {
   const computed = window.getComputedStyle(element);
   const rect = element.getBoundingClientRect();
+
+  // Use layout analyzer for proper flex/grid detection
+  const layout = analyzeLayout(element, computed);
 
   const node: BridgeNode = {
     tag: element.tagName.toLowerCase(),
     type: inferNodeType(element),
     children: [],
     styles: extractComputedStyles(computed),
-    layout: {
-      isAutoLayout: computed.display === 'flex' || computed.display === 'inline-flex',
-      direction: computed.flexDirection === 'column' ? 'vertical' : 'horizontal',
-      wrap: computed.flexWrap === 'wrap',
-      gap: parseFloat(computed.gap) || 0,
-      padding: {
-        top: parseFloat(computed.paddingTop) || 0,
-        right: parseFloat(computed.paddingRight) || 0,
-        bottom: parseFloat(computed.paddingBottom) || 0,
-        left: parseFloat(computed.paddingLeft) || 0,
-      },
-      sizing: { width: 'fixed', height: 'fixed' }, // TODO: infer from flex properties
-      mainAxisAlignment: mapJustifyContent(computed.justifyContent),
-      crossAxisAlignment: mapAlignItems(computed.alignItems),
-    },
+    layout,
     bounds: { x: rect.x, y: rect.y, width: rect.width, height: rect.height },
     visible: computed.display !== 'none' && computed.visibility !== 'hidden' && computed.opacity !== '0',
     classNames: Array.from(element.classList),
@@ -107,15 +100,38 @@ function walkDomNode(element: Element, depth: number): BridgeNode {
     node.text = element.textContent?.trim() || undefined;
   }
 
-  // Extract image URL
+  // Extract image data
   if (element instanceof HTMLImageElement) {
-    node.imageUrl = element.src;
+    const imageData = await collectImageData(element);
+    if (imageData) {
+      node.imageUrl = imageData.url;
+      node.imageDataUri = imageData.dataUri;
+    }
+  }
+
+  // Extract SVG data
+  if (element instanceof SVGSVGElement) {
+    node.svgData = collectSvgData(element);
+  }
+
+  // Component hash for detection
+  node.componentHash = hashComponent(element);
+
+  // Framer-specific metadata
+  const framerInfo = getFramerNodeInfo(element);
+  if (framerInfo) {
+    node.dataAttributes = {
+      ...node.dataAttributes,
+      ...(framerInfo.componentType ? { 'data-framer-component-type': framerInfo.componentType } : {}),
+      ...(framerInfo.name ? { 'data-framer-name': framerInfo.name } : {}),
+    };
   }
 
   // Recurse into children (up to MAX_NODE_DEPTH)
   if (depth < MAX_NODE_DEPTH) {
     for (const child of element.children) {
-      node.children.push(walkDomNode(child, depth + 1));
+      const childNode = await walkDomNode(child, depth + 1);
+      node.children.push(childNode);
     }
   }
 
@@ -158,25 +174,39 @@ function extractComputedStyles(cs: CSSStyleDeclaration): ComputedStyles {
     alignItems: cs.alignItems,
     alignSelf: cs.alignSelf,
     gap: cs.gap,
+    rowGap: cs.rowGap,
+    columnGap: cs.columnGap,
     paddingTop: cs.paddingTop,
     paddingRight: cs.paddingRight,
     paddingBottom: cs.paddingBottom,
     paddingLeft: cs.paddingLeft,
+    width: cs.width,
+    height: cs.height,
+    minWidth: cs.minWidth,
+    maxWidth: cs.maxWidth,
     borderRadius: cs.borderRadius,
+    borderTopLeftRadius: cs.borderTopLeftRadius,
+    borderTopRightRadius: cs.borderTopRightRadius,
+    borderBottomRightRadius: cs.borderBottomRightRadius,
+    borderBottomLeftRadius: cs.borderBottomLeftRadius,
     borderWidth: cs.borderWidth,
+    borderStyle: cs.borderStyle,
     boxShadow: cs.boxShadow,
     opacity: cs.opacity,
     overflow: cs.overflow,
+    backgroundImage: cs.backgroundImage,
+    transform: cs.transform,
   };
 }
 
-function extractMetadata(): SiteMetadata {
+function extractMetadata(isFramerSite: boolean, framerProjectId?: string): SiteMetadata {
   return {
     title: document.title,
     description: document.querySelector('meta[name="description"]')?.getAttribute('content') || undefined,
     favicon: (document.querySelector('link[rel="icon"]') as HTMLLinkElement)?.href || undefined,
     ogImage: document.querySelector('meta[property="og:image"]')?.getAttribute('content') || undefined,
-    isFramerSite: false, // TODO: detectFramerSite()
+    isFramerSite,
+    framerProjectId,
   };
 }
 
@@ -190,18 +220,53 @@ function extractDataAttributes(el: Element): Record<string, string> | undefined 
   return Object.keys(data).length > 0 ? data : undefined;
 }
 
-function mapJustifyContent(value: string): 'start' | 'center' | 'end' | 'space-between' {
-  if (value.includes('center')) return 'center';
-  if (value.includes('end') || value.includes('right')) return 'end';
-  if (value.includes('space-between')) return 'space-between';
-  return 'start';
+/**
+ * Detect the site framework (non-Framer).
+ */
+function detectFramework(): ExtractionResult['framework'] {
+  // Webflow
+  if (document.querySelector('html.w-mod-js') || document.querySelector('[data-wf-page]')) {
+    return 'webflow';
+  }
+  // WordPress
+  if (document.querySelector('meta[name="generator"][content*="WordPress"]') || document.body.classList.contains('wp-site')) {
+    return 'wordpress';
+  }
+  return 'unknown';
 }
 
-function mapAlignItems(value: string): 'start' | 'center' | 'end' | 'stretch' {
-  if (value.includes('center')) return 'center';
-  if (value.includes('end')) return 'end';
-  if (value.includes('stretch')) return 'stretch';
-  return 'start';
+/**
+ * Detect fonts used on the page.
+ */
+function detectFonts(): DetectedFont[] {
+  const fontMap = new Map<string, Set<number>>();
+
+  const elements = document.querySelectorAll('*');
+  for (const el of elements) {
+    const cs = window.getComputedStyle(el);
+    const family = cs.fontFamily.split(',')[0].trim().replace(/['"]/g, '');
+    const weight = parseInt(cs.fontWeight, 10) || 400;
+
+    if (!fontMap.has(family)) {
+      fontMap.set(family, new Set());
+    }
+    fontMap.get(family)!.add(weight);
+  }
+
+  const googleFonts = new Set<string>();
+  document.querySelectorAll('link[href*="fonts.googleapis.com"]').forEach((link) => {
+    const href = (link as HTMLLinkElement).href;
+    const familyMatch = href.match(/family=([^&:]+)/);
+    if (familyMatch) {
+      googleFonts.add(familyMatch[1].replace(/\+/g, ' '));
+    }
+  });
+
+  return Array.from(fontMap.entries()).map(([family, weights]) => ({
+    family,
+    weights: Array.from(weights).sort((a, b) => a - b),
+    isGoogleFont: googleFonts.has(family),
+  }));
 }
 
 // Listen for extraction requests from popup/service worker
