@@ -1,0 +1,66 @@
+---
+description: Rules for the web2figma Chrome Extension + Figma Plugin project
+alwaysApply: true
+---
+
+# web2figma — Cursor Rules
+
+## Project Type
+Chrome Extension (MV3) + Figma Plugin for website-to-Figma conversion. **No backend.**
+
+## Architecture
+- `extension/` — Chrome Extension (content script + popup + service worker)
+  - `extension/src/content/` — Content scripts injected into pages (DOM extraction)
+  - `extension/src/popup/` — Popup UI (Preact)
+  - `extension/src/background/` — Service worker (message relay)
+  - `extension/manifest.json` — Chrome MV3 manifest
+- `figma-plugin/` — Figma Plugin (sandbox + UI)
+  - `figma-plugin/src/main.ts` — Sandbox entry (Figma API access)
+  - `figma-plugin/src/converter.ts` — BridgeNode → Figma pipeline
+  - `figma-plugin/src/nodes/` — Node creators (frame, text, image, vector, styles)
+  - `figma-plugin/src/tokens/` — Design token creators (colors, typography, effects, variables)
+  - `figma-plugin/src/components/` — Component detection (detector, creator)
+  - `figma-plugin/src/ui/` — Plugin UI (Preact)
+  - `figma-plugin/manifest.json` — Figma plugin manifest
+- `shared/` — Shared types between extension and plugin
+  - `shared/types.ts` — BridgeNode, ComputedStyles, LayoutInfo, DesignTokens (the contract)
+  - `shared/constants.ts` — Viewports, thresholds, limits
+  - `shared/messages.ts` — Plugin ↔ UI message types
+
+## Key Constraints
+- Chrome Extension content scripts run in the page context — CAN access DOM, getComputedStyle, getBoundingClientRect
+- Chrome Extension popup/service worker CANNOT access page DOM (must use content script messaging)
+- Figma plugin sandbox has NO DOM access, NO fetch — communicate with UI via postMessage
+- Figma plugin UI iframe CAN fetch URLs (for image downloading)
+- Bridge format types in `shared/types.ts` are THE contract — both sides must agree
+- All Figma node creation in sandbox only (not UI)
+- Preact, not React, for all UI (smaller bundle)
+
+## Coding Conventions
+- TypeScript strict mode everywhere
+- One file per Figma node type: `figma-plugin/src/nodes/`
+- One file per token type: `figma-plugin/src/tokens/`
+- One file per extraction concern: `extension/src/content/`
+- All shared types in `shared/` — NEVER duplicate between extension and plugin
+- Preact functional components + hooks for UI
+- Test files: `*.test.ts` co-located with source
+- Error messages: user-friendly strings (shown in popup or plugin UI)
+
+## Agent Knowledge
+- CLAUDE.md: `/Users/imikaszab/Repos/web2figma/CLAUDE.md`
+- Product plan: `/Users/imikaszab/Repos/web2figma/PRODUCT_PLAN.md`
+- Hub agent: `/Users/imikaszab/Repos/compose-ai-agent-hub/agent/`
+- Figma plugin expert: `/Users/imikaszab/Repos/compose-ai-agent-hub/skills/figma-plugin-expert.md`
+- Web-to-design expert: `/Users/imikaszab/Repos/compose-ai-agent-hub/skills/web-to-design-expert.md`
+- Figma plugin dev template: `/Users/imikaszab/Repos/compose-ai-agent-hub/prompt-templates/figma-plugin-development.md`
+- Web-to-Figma template: `/Users/imikaszab/Repos/compose-ai-agent-hub/prompt-templates/web-to-figma-conversion.md`
+
+## DO NOT
+- Import React (use Preact)
+- Use eval() or dynamic code execution
+- Access DOM from Figma plugin sandbox
+- Access Figma API from plugin UI iframe
+- Change Bridge format types without updating both extension and plugin
+- Commit .env files or API keys
+- Send user data to external servers (everything stays local)
+- Use Manifest V2 APIs (deprecated)

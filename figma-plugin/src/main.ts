@@ -1,0 +1,93 @@
+/**
+ * Figma Plugin Sandbox entry point.
+ *
+ * Receives BridgeNode JSON from the UI iframe (pasted by user or relayed from Chrome Extension).
+ * Converts BridgeNode tree into Figma nodes with Auto Layout, styles, and components.
+ *
+ * Related files:
+ * - Converter pipeline: figma-plugin/src/converter.ts
+ * - Node creators: figma-plugin/src/nodes/ (frame.ts, text.ts, image.ts, vector.ts, styles.ts)
+ * - Token creators: figma-plugin/src/tokens/ (colors.ts, typography.ts, effects.ts, variables.ts)
+ * - Component creators: figma-plugin/src/components/ (detector.ts, creator.ts)
+ * - Plugin UI: figma-plugin/src/ui/App.tsx
+ * - Bridge format types: shared/types.ts
+ * - Message types: shared/messages.ts
+ * - Constants: shared/constants.ts
+ * - CLAUDE.md: /Users/imikaszab/Repos/web2figma/CLAUDE.md
+ * - Product plan: /Users/imikaszab/Repos/web2figma/PRODUCT_PLAN.md
+ */
+
+import { UI_WIDTH, UI_HEIGHT } from '../../shared/constants';
+import type { UiToSandboxMessage, SandboxToUiMessage } from '../../shared/messages';
+import type { ExtractionResult, ImportSettings } from '../../shared/types';
+import { DEFAULT_SETTINGS } from '../../shared/types';
+// import { convertToFigma } from './converter';
+
+figma.showUI(__html__, { width: UI_WIDTH, height: UI_HEIGHT, themeColors: true });
+
+async function loadSettings(): Promise<ImportSettings> {
+  const saved = await figma.clientStorage.getAsync('web2figma_settings');
+  return saved ? { ...DEFAULT_SETTINGS, ...saved } : DEFAULT_SETTINGS;
+}
+
+async function saveSettings(settings: ImportSettings): Promise<void> {
+  await figma.clientStorage.setAsync('web2figma_settings', settings);
+}
+
+function sendToUi(message: SandboxToUiMessage): void {
+  figma.ui.postMessage(message);
+}
+
+figma.ui.onmessage = async (msg: UiToSandboxMessage) => {
+  switch (msg.type) {
+    case 'START_IMPORT':
+      await handleImport(msg.json);
+      break;
+
+    case 'CANCEL_IMPORT':
+      // TODO: implement cancellation
+      break;
+
+    case 'UPDATE_SETTINGS': {
+      const current = await loadSettings();
+      const updated = { ...current, ...msg.settings };
+      await saveSettings(updated);
+      sendToUi({ type: 'SETTINGS_LOADED', settings: updated });
+      break;
+    }
+
+    case 'RESIZE_UI':
+      figma.ui.resize(msg.width, msg.height);
+      break;
+  }
+};
+
+async function handleImport(json: string): Promise<void> {
+  try {
+    sendToUi({ type: 'IMPORT_PROGRESS', phase: 'parsing', progress: 0, message: 'Parsing extraction...' });
+
+    const result: ExtractionResult = JSON.parse(json);
+    const settings = await loadSettings();
+
+    // TODO M2: convertToFigma(result, settings, onProgress)
+    // const { nodeCount, tokenCount, componentCount } = await convertToFigma(result, settings, (phase, progress) => {
+    //   sendToUi({ type: 'IMPORT_PROGRESS', phase, progress, message: `${phase}...` });
+    // });
+
+    sendToUi({
+      type: 'IMPORT_COMPLETE',
+      nodeCount: 0,
+      tokenCount: 0,
+      componentCount: 0,
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to parse extraction data';
+    sendToUi({ type: 'IMPORT_ERROR', error: message });
+  }
+}
+
+// Initialize
+(async () => {
+  const settings = await loadSettings();
+  sendToUi({ type: 'SETTINGS_LOADED', settings });
+})();
