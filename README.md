@@ -1,16 +1,16 @@
-# web2figma
+# Forge
 
 Convert any website into fully editable Figma designs — with intelligence.
 
-**web2figma** is a **Chrome Extension + Figma Plugin** pair that imports live websites into Figma with proper Auto Layout, editable text, extracted design tokens, and component detection. Works with **localhost**, **Framer preview**, private/authenticated pages — any page your browser can see.
+**Forge** is a **Chrome Extension + Figma Plugin** pair that imports live websites into Figma with proper Auto Layout, editable text, extracted design tokens, and component detection. Works with **localhost**, **Framer preview**, private/authenticated pages — any page your browser can see.
 
 Special **Framer-aware mode** delivers higher-fidelity conversion for Framer sites.
 
-## Why web2figma?
+## Why Forge?
 
-Existing tools flatten layouts, lose text editability, and ignore design tokens. web2figma does it differently:
+Existing tools flatten layouts, lose text editability, and ignore design tokens. Forge does it differently:
 
-| Feature | html.to.design | **web2figma** |
+| Feature | html.to.design | **Forge** |
 |---------|---------------|---------------|
 | Auto Layout from CSS flex/grid | Partial | Full |
 | Editable text (not images) | Sometimes | Always |
@@ -91,7 +91,7 @@ npm test
 1. Go to `chrome://extensions/`
 2. Enable "Developer mode"
 3. Click "Load unpacked" → select `dist/extension/`
-4. Navigate to any website → click the web2figma extension icon → "Extract"
+4. Navigate to any website → click the Forge extension icon → "Extract"
 
 ### Load Figma Plugin
 
@@ -102,7 +102,7 @@ npm test
 ## Project Structure
 
 ```
-web2figma/
+Forge/
 ├── extension/                    # Chrome Extension
 │   ├── manifest.json             # Chrome extension manifest (MV3)
 │   ├── src/
@@ -163,7 +163,7 @@ web2figma/
 ├── CLAUDE.md
 └── .cursor/
     └── rules/
-        └── web2figma.mdc
+        └── Forge.mdc
 ```
 
 ## Bridge Format

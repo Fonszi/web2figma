@@ -1,5 +1,5 @@
 /**
- * esbuild configuration for web2figma.
+ * esbuild configuration for Forge.
  *
  * Builds both the Chrome Extension and the Figma Plugin.
  *
@@ -105,7 +105,7 @@ async function build() {
   if (watch) {
     const contexts = await Promise.all(configs.map(c => esbuild.context(c)));
     await Promise.all(contexts.map(ctx => ctx.watch()));
-    console.log('[web2figma] Watching for changes...');
+    console.log('[forge] Watching for changes...');
   } else {
     await Promise.all(configs.map(c => esbuild.build(c)));
 
@@ -139,7 +139,7 @@ async function build() {
       );
     }
 
-    console.log(`[web2figma] Built: ${target}`);
+    console.log(`[forge] Built: ${target}`);
   }
 }
 

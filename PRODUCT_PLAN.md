@@ -1,4 +1,4 @@
-# web2figma — Product Plan
+# Forge — Product Plan
 
 ## Vision
 
@@ -31,7 +31,7 @@ html.to.design sends your URL to their server, which renders it with a headless 
 - Your design data passes through their cloud
 - They pay for server infrastructure → higher prices
 
-**web2figma uses a Chrome Extension.** The extension runs directly in your browser tab, extracting the DOM and computed styles from whatever page you're viewing. This means:
+**Forge uses a Chrome Extension.** The extension runs directly in your browser tab, extracting the DOM and computed styles from whatever page you're viewing. This means:
 - **localhost:3000** works perfectly (React dev server, Next.js, Framer preview, anything)
 - **Private/auth pages** work automatically (you're already logged in)
 - **$0 infrastructure** — no server to run or pay for
@@ -89,7 +89,7 @@ Chrome Extension content script injected
 BridgeNode JSON created locally in browser
     │ chrome.storage.local.set() or navigator.clipboard.writeText()
     ▼
-User opens Figma → runs web2figma plugin
+User opens Figma → runs Forge plugin
     │ Pastes JSON or plugin reads from extension relay
     ▼
 Figma plugin sandbox converts BridgeNode → Figma nodes
@@ -257,7 +257,7 @@ Based on html.to.design having 631k users with estimated 2-5% paid conversion:
 
 ## File References
 
-- Project root: `/Users/imikaszab/Repos/web2figma/`
+- Project root: `/Users/imikaszab/Repos/Forge/`
 - Bridge format types: `shared/types.ts`
 - Extension manifest: `extension/manifest.json`
 - Extension extractor: `extension/src/content/extractor.ts`

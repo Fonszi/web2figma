@@ -81,7 +81,7 @@ function App() {
         setState('done');
 
         // Store in chrome.storage for Figma plugin relay
-        await chrome.storage.local.set({ web2figma_extraction: extraction });
+        await chrome.storage.local.set({ forge_extraction: extraction });
       } else {
         throw new Error('Unexpected response from content script');
       }
@@ -130,7 +130,7 @@ function App() {
           <rect width="24" height="24" rx="4" fill="#0d99ff" />
           <path d="M6 8h12M6 12h12M6 16h8" stroke="white" stroke-width="2" stroke-linecap="round" />
         </svg>
-        <span class="header-title">web2figma</span>
+        <span class="header-title">Forge</span>
         <span class="header-version">v0.1.0</span>
       </div>
 
@@ -203,7 +203,7 @@ function App() {
 
       {/* Footer */}
       <div class="footer">
-        Paste the JSON into the web2figma Figma plugin to import.
+        Paste the JSON into the Forge Figma plugin to import.
       </div>
     </div>
   );

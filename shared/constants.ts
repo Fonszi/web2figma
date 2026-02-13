@@ -28,6 +28,6 @@ export const FREE_EXTRACTION_LIMIT = 15;
 export const MAX_INLINE_IMAGE_SIZE = 100_000; // 100KB
 
 /** Chrome storage key for extraction data (used in extension/src/background/service-worker.ts) */
-export const STORAGE_KEY_EXTRACTION = 'web2figma_extraction';
-export const STORAGE_KEY_SETTINGS = 'web2figma_settings';
-export const STORAGE_KEY_USAGE = 'web2figma_usage';
+export const STORAGE_KEY_EXTRACTION = 'forge_extraction';
+export const STORAGE_KEY_SETTINGS = 'forge_settings';
+export const STORAGE_KEY_USAGE = 'forge_usage';

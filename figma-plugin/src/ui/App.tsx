@@ -136,7 +136,7 @@ function App() {
     <div class="app">
       {/* Header */}
       <div class="header">
-        <h1>web2figma</h1>
+        <h1>Forge</h1>
         <span class="version">v0.1.0</span>
       </div>
 
@@ -150,7 +150,7 @@ function App() {
           <textarea
             ref={textareaRef}
             class="json-input"
-            placeholder='Paste the JSON from the web2figma Chrome Extension here...'
+            placeholder='Paste the JSON from the Forge Chrome Extension here...'
             value={json}
             onInput={(e) => setJson((e.target as HTMLTextAreaElement).value)}
             rows={8}

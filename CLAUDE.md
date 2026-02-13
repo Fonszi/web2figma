@@ -1,11 +1,11 @@
-# web2figma — AI Agent Context
+# Forge — AI Agent Context
 
 ## Project Overview
 
-- **Name:** web2figma
+- **Name:** Forge
 - **Type:** Chrome Extension + Figma Plugin (Web-to-Design conversion, fully local)
-- **Path:** `/Users/imikaszab/Repos/web2figma`
-- **GitHub:** `Fonszi/web2figma`
+- **Path:** `/Users/imikaszab/Repos/Forge`
+- **GitHub:** `Fonszi/forge`
 - **Stack:** TypeScript, Preact (popup + plugin UI), Chrome Extensions MV3 (content script + service worker), Figma Plugin API (sandbox), esbuild (build)
 - **Purpose:** Convert any website (including localhost, Framer preview, authenticated pages) into fully editable Figma designs with Auto Layout, design tokens, component detection, and Framer-aware mode. **No backend — fully local.**
 
@@ -104,5 +104,5 @@ npm run typecheck         # TypeScript check
 | Plugin assist template | `/Users/imikaszab/Repos/compose-ai-agent-hub/prompt-templates/plugin-assist.md` |
 | Related: compose-to-figma | `/Users/imikaszab/Repos/compose-to-figma` (Compose ↔ Figma, different domain) |
 | Related: compose-figma | `/Users/imikaszab/Repos/compose-figma` (Figma plugin + CMP app) |
-| Cursor rules for this project | `/Users/imikaszab/Repos/web2figma/.cursor/rules/web2figma.mdc` |
-| Product plan | `/Users/imikaszab/Repos/web2figma/PRODUCT_PLAN.md` |
+| Cursor rules for this project | `/Users/imikaszab/Repos/Forge/.cursor/rules/forge.mdc` |
+| Product plan | `/Users/imikaszab/Repos/Forge/PRODUCT_PLAN.md` |

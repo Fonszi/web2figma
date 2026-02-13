@@ -1,6 +1,6 @@
 {
-  "name": "web2figma",
-  "id": "web2figma-plugin",
+  "name": "Forge",
+  "id": "forge-plugin",
   "api": "1.0.0",
   "main": "dist/plugin.js",
   "ui": "dist/ui.html",

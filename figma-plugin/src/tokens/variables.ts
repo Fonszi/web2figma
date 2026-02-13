@@ -125,7 +125,7 @@ export async function createVariables(
     }
   } catch {
     // Variables API unavailable (free Figma plan or older API version)
-    console.warn('web2figma: Variables API unavailable, skipping variable creation');
+    console.warn('forge: Variables API unavailable, skipping variable creation');
   }
 
   return { byName, count: byName.size };

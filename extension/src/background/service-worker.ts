@@ -30,7 +30,7 @@ chrome.runtime.onMessage.addListener(
         break;
 
       case 'EXTRACTION_ERROR':
-        console.error('[web2figma] Extraction error:', message.error);
+        console.error('[forge] Extraction error:', message.error);
         break;
 
       case 'GET_EXTRACTION':
@@ -85,7 +85,7 @@ async function handleExtractPage(
 function handleExtractionComplete(result: ExtractionResult): void {
   latestExtraction = result;
   chrome.storage.local.set({ [STORAGE_KEY_EXTRACTION]: result }).catch((err) => {
-    console.error('[web2figma] Failed to store extraction:', err);
+    console.error('[forge] Failed to store extraction:', err);
   });
 }
 
@@ -103,9 +103,9 @@ async function copyToClipboard(data: string): Promise<void> {
       });
     }
   } catch (error) {
-    console.error('[web2figma] Clipboard copy failed:', error);
+    console.error('[forge] Clipboard copy failed:', error);
   }
 }
 
 // Log when service worker starts
-console.log('[web2figma] Service worker initialized');
+console.log('[forge] Service worker initialized');

@@ -13,8 +13,8 @@
  * - Bridge format types: shared/types.ts
  * - Message types: shared/messages.ts
  * - Constants: shared/constants.ts
- * - CLAUDE.md: /Users/imikaszab/Repos/web2figma/CLAUDE.md
- * - Product plan: /Users/imikaszab/Repos/web2figma/PRODUCT_PLAN.md
+ * - CLAUDE.md: CLAUDE.md
+ * - Product plan: PRODUCT_PLAN.md
  */
 
 import { UI_WIDTH, UI_HEIGHT } from '../../shared/constants';
@@ -27,12 +27,12 @@ import { handleImageDataFromUi } from './nodes/image';
 figma.showUI(__html__, { width: UI_WIDTH, height: UI_HEIGHT, themeColors: true });
 
 async function loadSettings(): Promise<ImportSettings> {
-  const saved = await figma.clientStorage.getAsync('web2figma_settings');
+  const saved = await figma.clientStorage.getAsync('forge_settings');
   return saved ? { ...DEFAULT_SETTINGS, ...saved } : DEFAULT_SETTINGS;
 }
 
 async function saveSettings(settings: ImportSettings): Promise<void> {
-  await figma.clientStorage.setAsync('web2figma_settings', settings);
+  await figma.clientStorage.setAsync('forge_settings', settings);
 }
 
 function sendToUi(message: SandboxToUiMessage): void {

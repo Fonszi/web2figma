@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "web2figma",
+  "name": "Forge",
   "version": "0.1.0",
   "description": "Extract any website's design and import it into Figma with Auto Layout, design tokens, and Framer-aware mode. Fully local — no backend.",
   "permissions": [
