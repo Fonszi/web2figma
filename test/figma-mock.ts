@@ -44,7 +44,22 @@ export interface MockVariableCollection {
   modes: { modeId: string }[];
 }
 
-export interface MockFrameNode {
+interface PluginDataMixin {
+  pluginData: Record<string, string>;
+  setPluginData: ReturnType<typeof vi.fn>;
+  getPluginData: ReturnType<typeof vi.fn>;
+}
+
+function withPluginData(): PluginDataMixin {
+  const data: Record<string, string> = {};
+  return {
+    pluginData: data,
+    setPluginData: vi.fn((key: string, value: string) => { data[key] = value; }),
+    getPluginData: vi.fn((key: string) => data[key] ?? ''),
+  };
+}
+
+export interface MockFrameNode extends PluginDataMixin {
   id: string;
   type: 'FRAME';
   name: string;
@@ -79,9 +94,10 @@ export interface MockFrameNode {
   resize: ReturnType<typeof vi.fn>;
   appendChild: ReturnType<typeof vi.fn>;
   children: unknown[];
+  remove: ReturnType<typeof vi.fn>;
 }
 
-export interface MockTextNode {
+export interface MockTextNode extends PluginDataMixin {
   id: string;
   type: 'TEXT';
   name: string;
@@ -97,9 +113,10 @@ export interface MockTextNode {
   fillStyleId: string;
   textStyleId: string;
   resize: ReturnType<typeof vi.fn>;
+  remove: ReturnType<typeof vi.fn>;
 }
 
-export interface MockRectangleNode {
+export interface MockRectangleNode extends PluginDataMixin {
   id: string;
   type: 'RECTANGLE';
   name: string;
@@ -110,9 +127,10 @@ export interface MockRectangleNode {
   strokeWeight: number;
   dashPattern: number[];
   resize: ReturnType<typeof vi.fn>;
+  remove: ReturnType<typeof vi.fn>;
 }
 
-export interface MockComponentNode {
+export interface MockComponentNode extends PluginDataMixin {
   id: string;
   type: 'COMPONENT';
   name: string;
@@ -124,6 +142,7 @@ export interface MockComponentNode {
   appendChild: ReturnType<typeof vi.fn>;
   createInstance: ReturnType<typeof vi.fn>;
   children: unknown[];
+  remove: ReturnType<typeof vi.fn>;
 }
 
 export interface MockInstanceNode {
@@ -215,6 +234,8 @@ function createMockFrame(): MockFrameNode {
     }),
     appendChild: vi.fn(),
     children: [],
+    remove: vi.fn(),
+    ...withPluginData(),
   };
   mockStore.frames.push(frame);
   return frame;
@@ -237,6 +258,8 @@ function createMockTextNode(): MockTextNode {
     fillStyleId: '',
     textStyleId: '',
     resize: vi.fn(),
+    remove: vi.fn(),
+    ...withPluginData(),
   };
   mockStore.textNodes.push(text);
   return text;
@@ -257,6 +280,8 @@ function createMockRectangle(): MockRectangleNode {
       this.width = w;
       this.height = h;
     }),
+    remove: vi.fn(),
+    ...withPluginData(),
   };
   mockStore.rectangles.push(rect);
   return rect;
@@ -292,6 +317,8 @@ function createMockComponent(): MockComponentNode {
       return instance;
     }),
     children: [],
+    remove: vi.fn(),
+    ...withPluginData(),
   };
   mockStore.components.push(component);
   return component;
@@ -431,8 +458,21 @@ export function setupFigmaMock(): void {
       scrollAndZoomIntoView: vi.fn(),
     },
 
+    getNodeById: vi.fn((id: string) => {
+      const allNodes = [
+        ...mockStore.frames,
+        ...mockStore.textNodes,
+        ...mockStore.rectangles,
+        ...mockStore.components,
+        ...mockStore.instances,
+        ...mockStore.sections,
+      ];
+      return allNodes.find((n) => n.id === id) ?? null;
+    }),
+
     currentPage: {
       selection: [] as unknown[],
+      children: [] as unknown[],
     },
 
     ui: {

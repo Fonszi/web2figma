@@ -16,6 +16,7 @@ import { render } from 'preact';
 import { useState, useEffect, useCallback } from 'preact/hooks';
 import type { ExtractionResult, MultiViewportResult, ViewportExtraction } from '../../../shared/types';
 import { VIEWPORTS, STORAGE_KEY_SELECTED_VIEWPORTS, DEFAULT_SELECTED_VIEWPORTS, type ViewportPreset } from '../../../shared/constants';
+import { checkRelayHealth, postExtraction } from '../../../shared/relay-client';
 import { ViewportPicker } from './ViewportPicker';
 
 interface TabInfo {
@@ -38,9 +39,14 @@ function App() {
   const [selectedViewports, setSelectedViewports] = useState<ViewportPreset[]>(DEFAULT_SELECTED_VIEWPORTS);
   const [customWidths, setCustomWidths] = useState<number[]>([]);
   const [extractionProgress, setExtractionProgress] = useState('');
+  const [relayAvailable, setRelayAvailable] = useState(false);
+  const [relaySent, setRelaySent] = useState(false);
 
-  // Get current tab info and load saved viewport selection on mount
+  // Get current tab info, load saved viewport selection, check relay on mount
   useEffect(() => {
+    checkRelayHealth().then((health) => {
+      setRelayAvailable(health !== null);
+    });
     chrome.tabs.query({ active: true, currentWindow: true }).then(([tab]) => {
       if (tab) {
         setTabInfo({
@@ -117,6 +123,13 @@ function App() {
           setExtractionTime(Date.now() - startTime);
           setState('done');
           await chrome.storage.local.set({ forge_extraction: extraction });
+
+          // Auto-POST to relay (fire-and-forget)
+          if (relayAvailable) {
+            postExtraction(extraction).then((sent) => {
+              if (sent) setRelaySent(true);
+            });
+          }
         } else {
           throw new Error('Unexpected response from content script');
         }
@@ -185,6 +198,13 @@ function App() {
         setExtractionTime(Date.now() - startTime);
         setState('done');
         await chrome.storage.local.set({ forge_extraction: multi });
+
+        // Auto-POST to relay (fire-and-forget)
+        if (relayAvailable) {
+          postExtraction(multi).then((sent) => {
+            if (sent) setRelaySent(true);
+          });
+        }
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Extraction failed');
@@ -297,6 +317,7 @@ function App() {
         </svg>
         <span class="header-title">Forge</span>
         <span class="header-version">v0.1.0</span>
+        <span class={`relay-status ${relayAvailable ? 'relay-connected' : ''}`} title={relayAvailable ? 'Relay server connected' : 'Relay server offline'} />
       </div>
 
       {/* Page info */}
@@ -348,6 +369,9 @@ function App() {
           <button class={`btn-copy ${copied ? 'copied' : ''}`} onClick={handleCopy}>
             {copied ? 'Copied to clipboard' : 'Copy JSON for Figma'}
           </button>
+          {relaySent && (
+            <div class="relay-sent">Sent to Figma Plugin via relay</div>
+          )}
         </div>
       )}
 

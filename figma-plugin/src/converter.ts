@@ -21,6 +21,7 @@
 
 import type { ExtractionResult, ImportSettings, BridgeNode } from '../../shared/types';
 import type { ImportPhase } from '../../shared/messages';
+import { computeFingerprint } from '../../shared/diffing';
 import { createFrameNode } from './nodes/frame';
 import { createTextNode } from './nodes/text';
 import { createImageNode } from './nodes/image';
@@ -95,6 +96,11 @@ export async function convertToFigma(
     Math.max(1, result.viewport.height),
   );
   pageFrame.fills = [];
+
+  // Store import metadata for re-import diffing
+  pageFrame.setPluginData('forgeImport', 'true');
+  pageFrame.setPluginData('forgeUrl', result.url);
+  pageFrame.setPluginData('forgeTimestamp', String(result.timestamp));
 
   onProgress('creating-nodes', 0, `Creating ${totalNodes} nodes...`);
 
@@ -232,6 +238,10 @@ async function convertNode(
     }
   }
 
+  // Store diffing metadata
+  figmaNode.setPluginData('bridgePath', nodeId);
+  figmaNode.setPluginData('bridgeFingerprint', computeFingerprint(node));
+
   // Append to parent
   parent.appendChild(figmaNode);
   onNodeCreated(1);
@@ -308,6 +318,11 @@ export async function convertToFigmaAsComponent(
     Math.max(1, result.viewport.height),
   );
   component.fills = [];
+
+  // Store import metadata for re-import diffing
+  component.setPluginData('forgeImport', 'true');
+  component.setPluginData('forgeUrl', result.url);
+  component.setPluginData('forgeTimestamp', String(result.timestamp));
 
   onProgress('creating-nodes', 0, `Creating ${totalNodes} nodes...`);
 

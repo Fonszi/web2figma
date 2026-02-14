@@ -163,6 +163,54 @@
     .component-item-icon { font-size: 10px; color: var(--accent); flex-shrink: 0; }
     .component-item-name { font-size: 11px; color: var(--text-secondary); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .component-item-count { font-size: 10px; color: var(--text-muted); flex-shrink: 0; }
+
+    /* Relay */
+    .relay-status { width: 8px; height: 8px; border-radius: 50%; background: var(--text-muted); margin-left: auto; }
+    .relay-status.relay-connected { background: var(--success); }
+    .btn-relay {
+      flex: 1; padding: 8px;
+      background: transparent; color: var(--text-secondary);
+      border: 1px solid var(--border); border-radius: var(--radius);
+      cursor: pointer; font-size: 12px;
+    }
+    .btn-relay:hover { background: var(--bg-input); border-color: var(--text-muted); }
+    .btn-reimport {
+      flex: 1; padding: 8px;
+      background: transparent; color: var(--accent);
+      border: 1px solid var(--accent); border-radius: var(--radius);
+      cursor: pointer; font-size: 12px;
+    }
+    .btn-reimport:hover { background: rgba(13, 153, 255, 0.1); }
+
+    /* Diff Panel */
+    .diff-panel { display: flex; flex-direction: column; gap: 12px; }
+    .diff-header h2 { font-size: 14px; font-weight: 600; margin-bottom: 6px; }
+    .diff-summary { display: flex; flex-wrap: wrap; gap: 6px; }
+    .diff-badge { font-size: 11px; padding: 2px 8px; border-radius: 12px; }
+    .diff-badge--modified { background: rgba(255, 205, 41, 0.15); color: #ffcd29; }
+    .diff-badge--added { background: rgba(20, 174, 92, 0.15); color: #14ae5c; }
+    .diff-badge--removed { background: rgba(242, 72, 34, 0.15); color: #f24822; }
+    .diff-badge--unchanged { background: rgba(128, 128, 128, 0.15); color: var(--text-muted); }
+
+    .diff-list { max-height: 300px; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; }
+    .diff-item { display: flex; align-items: center; gap: 6px; padding: 4px 6px; border-radius: 4px; cursor: pointer; font-size: 11px; }
+    .diff-item:hover { background: var(--bg-input); }
+    .diff-item input[type="checkbox"] { flex-shrink: 0; }
+    .diff-type-icon { width: 16px; height: 16px; display: flex; align-items: center; justify-content: center; border-radius: 3px; font-size: 12px; font-weight: 700; flex-shrink: 0; }
+    .diff-type-icon--modified { background: rgba(255, 205, 41, 0.2); color: #ffcd29; }
+    .diff-type-icon--added { background: rgba(20, 174, 92, 0.2); color: #14ae5c; }
+    .diff-type-icon--removed { background: rgba(242, 72, 34, 0.2); color: #f24822; }
+    .diff-item-desc { flex: 1; color: var(--text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .diff-item-path { font-size: 9px; color: var(--text-muted); font-family: monospace; flex-shrink: 0; }
+
+    .diff-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+    .btn-apply { flex: 2; padding: 8px; background: var(--accent); color: white; border: none; border-radius: var(--radius); font-weight: 600; font-size: 12px; cursor: pointer; }
+    .btn-apply:hover:not(:disabled) { background: var(--accent-hover); }
+    .btn-apply:disabled { opacity: 0.4; cursor: not-allowed; }
+    .btn-full-reimport { flex: 1; padding: 8px; background: transparent; color: var(--text-secondary); border: 1px solid var(--border); border-radius: var(--radius); font-size: 12px; cursor: pointer; }
+    .btn-full-reimport:hover { background: var(--bg-input); }
+    .btn-cancel { flex: 1; padding: 8px; background: transparent; color: var(--text-muted); border: 1px solid var(--border); border-radius: var(--radius); font-size: 12px; cursor: pointer; }
+    .btn-cancel:hover { background: var(--bg-input); }
   </style>
 </head>
 <body>

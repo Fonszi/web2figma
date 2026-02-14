@@ -12,7 +12,8 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "lint": "eslint '{extension,figma-plugin,shared}/**/*.{ts,tsx}'",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "relay": "node relay/server.mjs"
   },
   "devDependencies": {
     "@figma/plugin-typings": "^1.100.0",

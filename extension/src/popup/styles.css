@@ -342,6 +342,27 @@ body {
   color: var(--text-muted);
 }
 
+/* Relay status indicator */
+.relay-status {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  margin-left: 6px;
+  transition: background 0.3s;
+}
+
+.relay-status.relay-connected {
+  background: var(--success);
+}
+
+.relay-sent {
+  font-size: 11px;
+  color: var(--success);
+  text-align: center;
+  padding: 4px 0;
+}
+
 /* Footer hint */
 .footer {
   font-size: 11px;

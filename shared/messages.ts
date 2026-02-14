@@ -17,6 +17,8 @@ import type { ExtractionResult, ImportSettings } from './types';
 
 export type UiToSandboxMessage =
   | { type: 'START_IMPORT'; json: string }
+  | { type: 'START_REIMPORT'; json: string }
+  | { type: 'APPLY_DIFF'; changeIds: string[]; mode: 'update-changed' | 'full-reimport' }
   | { type: 'CANCEL_IMPORT' }
   | { type: 'UPDATE_SETTINGS'; settings: Partial<ImportSettings> }
   | { type: 'RESIZE_UI'; width: number; height: number };
@@ -25,7 +27,9 @@ export type SandboxToUiMessage =
   | { type: 'IMPORT_PROGRESS'; phase: ImportPhase; progress: number; message: string }
   | { type: 'IMPORT_COMPLETE'; nodeCount: number; tokenCount: number; componentCount: number; styleCount: number; sectionCount: number; variantCount?: number }
   | { type: 'IMPORT_ERROR'; error: string }
-  | { type: 'SETTINGS_LOADED'; settings: ImportSettings };
+  | { type: 'SETTINGS_LOADED'; settings: ImportSettings }
+  | { type: 'DIFF_RESULT'; changes: DiffChange[]; summary: DiffSummary }
+  | { type: 'REIMPORT_COMPLETE'; updatedCount: number; addedCount: number; removedCount: number };
 
 export type ImportPhase =
   | 'parsing'
@@ -35,6 +39,8 @@ export type ImportPhase =
   | 'creating-sections'
   | 'creating-variants'
   | 'loading-images'
+  | 'diffing'
+  | 'applying-diff'
   | 'finalizing';
 
 export const PHASE_LABELS: Record<ImportPhase, string> = {
@@ -45,8 +51,29 @@ export const PHASE_LABELS: Record<ImportPhase, string> = {
   'creating-sections': 'Organizing sections...',
   'creating-variants': 'Creating viewport variants...',
   'loading-images': 'Loading images...',
+  diffing: 'Comparing with existing import...',
+  'applying-diff': 'Applying changes...',
   finalizing: 'Finalizing import...',
 };
+
+// --- Re-Import Diffing Types ---
+
+export interface DiffChange {
+  id: string;
+  type: 'modified' | 'added' | 'removed';
+  path: string;
+  nodeType: string;
+  description: string;
+  selected: boolean;
+}
+
+export interface DiffSummary {
+  totalNodes: number;
+  modifiedCount: number;
+  addedCount: number;
+  removedCount: number;
+  unchangedCount: number;
+}
 
 // --- Channel 2 & 3: Chrome Extension Messages ---
 

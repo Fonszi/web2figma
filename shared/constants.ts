@@ -38,3 +38,19 @@ export type ViewportPreset = keyof typeof VIEWPORTS;
 
 /** Default selected viewports (single desktop for backward compatibility). */
 export const DEFAULT_SELECTED_VIEWPORTS: ViewportPreset[] = ['desktop'];
+
+// ============================================================
+// Relay Server — Local HTTP bridge between Extension and Plugin
+// ============================================================
+
+/** Port for the local relay server. */
+export const RELAY_PORT = 19876;
+
+/** Base URL for the local relay server. */
+export const RELAY_BASE_URL = `http://localhost:${RELAY_PORT}`;
+
+/** Relay health check endpoint. */
+export const RELAY_HEALTH_ENDPOINT = '/health';
+
+/** Relay extraction data endpoint. */
+export const RELAY_EXTRACTION_ENDPOINT = '/extraction';

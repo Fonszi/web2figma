@@ -25,6 +25,7 @@ import { convertToFigma } from './converter';
 import { handleImageDataFromUi } from './nodes/image';
 import { isMultiViewport } from '../../shared/types';
 import { createViewportVariants } from './components/variants';
+import { findExistingImport, computeReimportDiff, applyDiffChanges } from './reimporter';
 import { capturePluginError } from '../../shared/monitor';
 
 figma.showUI(__html__, { width: UI_WIDTH, height: UI_HEIGHT, themeColors: true });
@@ -46,6 +47,14 @@ figma.ui.onmessage = async (msg: UiToSandboxMessage & { type: string; nodeId?: s
   switch (msg.type) {
     case 'START_IMPORT':
       await handleImport((msg as UiToSandboxMessage & { type: 'START_IMPORT' }).json);
+      break;
+
+    case 'START_REIMPORT':
+      await handleReimport((msg as UiToSandboxMessage & { type: 'START_REIMPORT' }).json);
+      break;
+
+    case 'APPLY_DIFF':
+      await handleApplyDiff(msg as UiToSandboxMessage & { type: 'APPLY_DIFF' });
       break;
 
     case 'CANCEL_IMPORT':
@@ -124,6 +133,110 @@ async function handleImport(json: string): Promise<void> {
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to parse extraction data';
     capturePluginError(message, 'handleImport', error instanceof Error ? error : null);
+    sendToUi({ type: 'IMPORT_ERROR', error: message });
+  }
+}
+
+// Re-import state (held between START_REIMPORT and APPLY_DIFF)
+let pendingReimportJson: string | null = null;
+let pendingReimportFrame: FrameNode | null = null;
+
+async function handleReimport(json: string): Promise<void> {
+  try {
+    sendToUi({ type: 'IMPORT_PROGRESS', phase: 'parsing', progress: 0, message: 'Parsing extraction...' });
+
+    const parsed = JSON.parse(json);
+    if (isMultiViewport(parsed)) {
+      // Multi-viewport re-import not supported yet — fall through to normal import
+      await handleImport(json);
+      return;
+    }
+
+    const result: ExtractionResult = parsed;
+    const existingFrame = findExistingImport(result.url);
+
+    if (!existingFrame) {
+      // No existing import found — do a fresh import
+      await handleImport(json);
+      return;
+    }
+
+    // Compute diff
+    const { changes, summary } = await computeReimportDiff(
+      result,
+      existingFrame,
+      (phase, progress, message) => {
+        sendToUi({ type: 'IMPORT_PROGRESS', phase, progress, message });
+      },
+    );
+
+    // Store for APPLY_DIFF
+    pendingReimportJson = json;
+    pendingReimportFrame = existingFrame;
+
+    sendToUi({ type: 'DIFF_RESULT', changes, summary });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to compute diff';
+    capturePluginError(message, 'handleReimport', error instanceof Error ? error : null);
+    sendToUi({ type: 'IMPORT_ERROR', error: message });
+  }
+}
+
+async function handleApplyDiff(msg: { changeIds: string[]; mode: 'update-changed' | 'full-reimport' }): Promise<void> {
+  try {
+    if (msg.mode === 'full-reimport') {
+      if (pendingReimportJson) {
+        await handleImport(pendingReimportJson);
+      }
+      pendingReimportJson = null;
+      pendingReimportFrame = null;
+      return;
+    }
+
+    if (!pendingReimportJson || !pendingReimportFrame) {
+      sendToUi({ type: 'IMPORT_ERROR', error: 'No pending re-import data' });
+      return;
+    }
+
+    const result: ExtractionResult = JSON.parse(pendingReimportJson);
+    const settings = await loadSettings();
+
+    // Re-compute diff to get change objects with selection state
+    const { changes } = await computeReimportDiff(
+      result,
+      pendingReimportFrame,
+      () => {},
+    );
+
+    // Mark selected changes
+    const selectedIds = new Set(msg.changeIds);
+    const selectedChanges = changes.map((c) => ({
+      ...c,
+      selected: selectedIds.has(c.id),
+    }));
+
+    const counts = await applyDiffChanges(
+      selectedChanges,
+      result,
+      pendingReimportFrame,
+      settings,
+      (phase, progress, message) => {
+        sendToUi({ type: 'IMPORT_PROGRESS', phase, progress, message });
+      },
+    );
+
+    sendToUi({
+      type: 'REIMPORT_COMPLETE',
+      updatedCount: counts.updatedCount,
+      addedCount: counts.addedCount,
+      removedCount: counts.removedCount,
+    });
+
+    pendingReimportJson = null;
+    pendingReimportFrame = null;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to apply diff';
+    capturePluginError(message, 'handleApplyDiff', error instanceof Error ? error : null);
     sendToUi({ type: 'IMPORT_ERROR', error: message });
   }
 }

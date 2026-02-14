@@ -13,14 +13,16 @@
 
 import { render } from 'preact';
 import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
-import type { SandboxToUiMessage, ImportPhase } from '../../../shared/messages';
+import type { SandboxToUiMessage, ImportPhase, DiffChange, DiffSummary } from '../../../shared/messages';
 import { PHASE_LABELS } from '../../../shared/messages';
 import type { ImportSettings, ExtractionResult } from '../../../shared/types';
 import { DEFAULT_SETTINGS } from '../../../shared/types';
+import { checkRelayHealth, fetchExtraction } from '../../../shared/relay-client';
 import { TokenPanel } from './components/TokenPanel';
 import { ComponentPanel } from './components/ComponentPanel';
+import { DiffPanel } from './components/DiffPanel';
 
-type UiState = 'idle' | 'importing' | 'done' | 'error';
+type UiState = 'idle' | 'importing' | 'done' | 'error' | 'diff-review';
 
 function App() {
   const [state, setState] = useState<UiState>('idle');
@@ -31,7 +33,18 @@ function App() {
   const [result, setResult] = useState<{ nodeCount: number; tokenCount: number; componentCount: number; styleCount: number; sectionCount: number; variantCount?: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [settings, setSettings] = useState<ImportSettings>(DEFAULT_SETTINGS);
+  const [relayAvailable, setRelayAvailable] = useState(false);
+  const [diffChanges, setDiffChanges] = useState<DiffChange[]>([]);
+  const [diffSummary, setDiffSummary] = useState<DiffSummary | null>(null);
+  const [reimportResult, setReimportResult] = useState<{ updatedCount: number; addedCount: number; removedCount: number } | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Check relay health on mount
+  useEffect(() => {
+    checkRelayHealth().then((health) => {
+      setRelayAvailable(health !== null);
+    });
+  }, []);
 
   // Listen for messages from the plugin sandbox
   useEffect(() => {
@@ -58,6 +71,17 @@ function App() {
 
         case 'SETTINGS_LOADED':
           setSettings(msg.settings);
+          break;
+
+        case 'DIFF_RESULT':
+          setState('diff-review');
+          setDiffChanges(msg.changes);
+          setDiffSummary(msg.summary);
+          break;
+
+        case 'REIMPORT_COMPLETE':
+          setState('done');
+          setReimportResult({ updatedCount: msg.updatedCount, addedCount: msg.addedCount, removedCount: msg.removedCount });
           break;
       }
     };
@@ -118,11 +142,46 @@ function App() {
     }
   }, []);
 
+  const handleFetchFromRelay = useCallback(async () => {
+    const data = await fetchExtraction();
+    if (data) {
+      const jsonStr = JSON.stringify(data, null, 2);
+      setJson(jsonStr);
+    }
+  }, []);
+
+  const handleReimport = useCallback(() => {
+    if (!json.trim()) return;
+    setState('importing');
+    setError(null);
+    setResult(null);
+    setReimportResult(null);
+    setDiffChanges([]);
+    setDiffSummary(null);
+    setProgress(0);
+    parent.postMessage({ pluginMessage: { type: 'START_REIMPORT', json } }, '*');
+  }, [json]);
+
+  const handleApplyDiff = useCallback((changeIds: string[], mode: 'update-changed' | 'full-reimport') => {
+    setState('importing');
+    setProgress(0);
+    parent.postMessage({ pluginMessage: { type: 'APPLY_DIFF', changeIds, mode } }, '*');
+  }, []);
+
+  const handleToggleDiffChange = useCallback((id: string) => {
+    setDiffChanges((prev) =>
+      prev.map((c) => (c.id === id ? { ...c, selected: !c.selected } : c)),
+    );
+  }, []);
+
   const handleReset = useCallback(() => {
     setState('idle');
     setJson('');
     setError(null);
     setResult(null);
+    setReimportResult(null);
+    setDiffChanges([]);
+    setDiffSummary(null);
     setProgress(0);
   }, []);
 
@@ -138,6 +197,7 @@ function App() {
       <div class="header">
         <h1>Forge</h1>
         <span class="version">v0.1.0</span>
+        <span class={`relay-status ${relayAvailable ? 'relay-connected' : ''}`} title={relayAvailable ? 'Relay connected' : 'Relay offline'} />
       </div>
 
       {/* Idle: JSON input */}
@@ -157,6 +217,9 @@ function App() {
           />
           <div class="actions">
             <button class="btn-paste" onClick={handlePaste}>Paste from clipboard</button>
+            {relayAvailable && (
+              <button class="btn-relay" onClick={handleFetchFromRelay}>Fetch from Relay</button>
+            )}
             <button
               class="btn-import"
               onClick={handleImport}
@@ -164,6 +227,14 @@ function App() {
             >
               Import to Figma
             </button>
+            {isValidJson && (
+              <button
+                class="btn-reimport"
+                onClick={handleReimport}
+              >
+                Re-import (diff)
+              </button>
+            )}
           </div>
           {json.trim().length > 0 && !isValidJson && (
             <div class="validation-error">Invalid JSON format</div>
@@ -182,8 +253,48 @@ function App() {
         </div>
       )}
 
+      {/* Diff Review */}
+      {state === 'diff-review' && diffSummary && (
+        <DiffPanel
+          changes={diffChanges}
+          summary={diffSummary}
+          onToggleChange={handleToggleDiffChange}
+          onApplySelected={() => {
+            const selectedIds = diffChanges.filter((c) => c.selected).map((c) => c.id);
+            handleApplyDiff(selectedIds, 'update-changed');
+          }}
+          onFullReimport={() => {
+            handleApplyDiff([], 'full-reimport');
+          }}
+          onCancel={handleReset}
+        />
+      )}
+
+      {/* Re-import complete */}
+      {state === 'done' && reimportResult && (
+        <div class="result-section">
+          <div class="result-icon">✓</div>
+          <div class="result-title">Re-import complete</div>
+          <div class="result-stats">
+            <div class="stat">
+              <span class="stat-value">{reimportResult.updatedCount}</span>
+              <span class="stat-label">Updated</span>
+            </div>
+            <div class="stat">
+              <span class="stat-value">{reimportResult.addedCount}</span>
+              <span class="stat-label">Added</span>
+            </div>
+            <div class="stat">
+              <span class="stat-value">{reimportResult.removedCount}</span>
+              <span class="stat-label">Removed</span>
+            </div>
+          </div>
+          <button class="btn-reset" onClick={handleReset}>Import another</button>
+        </div>
+      )}
+
       {/* Done: Result */}
-      {state === 'done' && result && (
+      {state === 'done' && result && !reimportResult && (
         <div class="result-section">
           <div class="result-icon">✓</div>
           <div class="result-title">Import complete</div>
