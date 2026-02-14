@@ -206,3 +206,31 @@ export const DEFAULT_SETTINGS: ImportSettings = {
   maxDepth: 50,
   imageQuality: 'high',
 };
+
+// ============================================================
+// Multi-Viewport Extraction — Sequential viewport extractions
+// for responsive design variant creation.
+// ============================================================
+
+export interface ViewportExtraction {
+  viewportKey: string;
+  label: string;
+  width: number;
+  height: number;
+  result: ExtractionResult;
+}
+
+export interface MultiViewportResult {
+  type: 'multi-viewport';
+  url: string;
+  timestamp: number;
+  extractions: ViewportExtraction[];
+}
+
+/** Union type for import payloads — plugin must handle both. */
+export type ImportPayload = ExtractionResult | MultiViewportResult;
+
+/** Type guard to distinguish multi-viewport from single-viewport payloads. */
+export function isMultiViewport(payload: ImportPayload): payload is MultiViewportResult {
+  return 'type' in payload && (payload as MultiViewportResult).type === 'multi-viewport';
+}

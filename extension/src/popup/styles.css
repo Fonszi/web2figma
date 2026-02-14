@@ -220,6 +220,128 @@ body {
   background: rgba(242, 72, 34, 0.15);
 }
 
+/* Viewport picker */
+.viewport-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.viewport-picker-label {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.viewport-picker-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.viewport-pill {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+  white-space: nowrap;
+}
+
+.viewport-pill:hover:not(:disabled) {
+  border-color: var(--text-muted);
+  color: var(--text-primary);
+}
+
+.viewport-pill.active {
+  background: rgba(13, 153, 255, 0.15);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.viewport-pill.add-custom {
+  padding: 4px 8px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.viewport-pill:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.viewport-pill-width {
+  font-size: 10px;
+  opacity: 0.7;
+}
+
+.viewport-custom-input {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.viewport-custom-input input {
+  width: 100px;
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  font-size: 12px;
+  outline: none;
+}
+
+.viewport-custom-input input:focus {
+  border-color: var(--accent);
+}
+
+.viewport-custom-input button {
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.viewport-custom-input button:hover:not(:disabled) {
+  background: var(--bg-hover);
+}
+
+/* Multi-viewport result rows */
+.viewport-results {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 8px;
+}
+
+.viewport-result-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 0;
+  font-size: 12px;
+}
+
+.viewport-result-label {
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.viewport-result-detail {
+  color: var(--text-muted);
+}
+
 /* Footer hint */
 .footer {
   font-size: 11px;

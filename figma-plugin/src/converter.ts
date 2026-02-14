@@ -242,10 +242,109 @@ async function convertNode(
   }
 }
 
-function countNodes(node: BridgeNode): number {
+export function countNodes(node: BridgeNode): number {
   let count = 1;
   for (const child of node.children) {
     count += countNodes(child);
   }
   return count;
+}
+
+/**
+ * Convert an ExtractionResult into a Figma ComponentNode (for multi-viewport variants).
+ * Same pipeline as convertToFigma but returns a ComponentNode instead of placing on page.
+ * Accepts an optional pre-built StyleMap to avoid duplicate token creation across viewports.
+ */
+export async function convertToFigmaAsComponent(
+  result: ExtractionResult,
+  variantLabel: string,
+  settings: ImportSettings,
+  onProgress: ProgressCallback,
+  existingStyleMap?: StyleMap,
+): Promise<{ component: ComponentNode; counts: ConvertResult }> {
+  onProgress('parsing', 0, 'Preparing import...');
+
+  const isFramer = result.metadata.isFramerSite && settings.framerAwareMode;
+  const tokens = isFramer ? enhanceFramerTokens(result.tokens) : result.tokens;
+
+  // Use existing style map or create new one
+  let styleMap: StyleMap;
+  if (existingStyleMap) {
+    styleMap = existingStyleMap;
+  } else {
+    onProgress('creating-styles', 0, 'Creating design tokens...');
+    styleMap = await createAllStyles(
+      tokens,
+      settings,
+      (message, progress) => onProgress('creating-styles', progress, message),
+    );
+  }
+
+  // Detect and create components
+  onProgress('creating-components', 0, 'Detecting components...');
+  let detected = detectComponents(result.rootNode);
+  if (isFramer) {
+    detected = enhanceFramerComponents(detected, result.rootNode);
+  }
+
+  const componentMap = await createComponents(
+    detected,
+    settings,
+    styleMap,
+    (created, total) => {
+      const progress = 0.3 + (created / total) * 0.7;
+      onProgress('creating-components', progress, `Creating component ${created}/${total}...`);
+    },
+  );
+
+  const totalNodes = countNodes(result.rootNode);
+  let processedNodes = 0;
+
+  // Create a ComponentNode as the top-level wrapper
+  const component = figma.createComponent();
+  component.name = variantLabel;
+  component.resize(
+    Math.max(1, result.viewport.width),
+    Math.max(1, result.viewport.height),
+  );
+  component.fills = [];
+
+  onProgress('creating-nodes', 0, `Creating ${totalNodes} nodes...`);
+
+  await convertNode(
+    result.rootNode,
+    component,
+    settings,
+    0,
+    'root',
+    (count) => {
+      processedNodes += count;
+      const progress = Math.min(0.95, processedNodes / totalNodes);
+      onProgress('creating-nodes', progress, `Created ${processedNodes}/${totalNodes} nodes`);
+    },
+    styleMap,
+    componentMap,
+    isFramer,
+  );
+
+  let sectionCount = 0;
+  if (isFramer) {
+    onProgress('creating-sections', 0, 'Organizing Framer sections...');
+    sectionCount = organizeFramerSections(component as unknown as FrameNode, result.rootNode);
+    onProgress('creating-sections', 1, `Created ${sectionCount} sections`);
+  }
+
+  const styleCount = styleMap.colors.count + styleMap.typography.count
+    + styleMap.effects.count + styleMap.variables.count;
+
+  return {
+    component,
+    counts: {
+      nodeCount: processedNodes,
+      tokenCount: tokens.colors.length + tokens.typography.length + tokens.effects.length,
+      componentCount: componentMap.count,
+      styleCount,
+      sectionCount,
+    },
+  };
 }

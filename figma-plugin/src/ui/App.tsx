@@ -28,7 +28,7 @@ function App() {
   const [phase, setPhase] = useState<ImportPhase>('parsing');
   const [progress, setProgress] = useState(0);
   const [progressMessage, setProgressMessage] = useState('');
-  const [result, setResult] = useState<{ nodeCount: number; tokenCount: number; componentCount: number; styleCount: number; sectionCount: number } | null>(null);
+  const [result, setResult] = useState<{ nodeCount: number; tokenCount: number; componentCount: number; styleCount: number; sectionCount: number; variantCount?: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [settings, setSettings] = useState<ImportSettings>(DEFAULT_SETTINGS);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -48,7 +48,7 @@ function App() {
 
         case 'IMPORT_COMPLETE':
           setState('done');
-          setResult({ nodeCount: msg.nodeCount, tokenCount: msg.tokenCount, componentCount: msg.componentCount, styleCount: msg.styleCount, sectionCount: msg.sectionCount });
+          setResult({ nodeCount: msg.nodeCount, tokenCount: msg.tokenCount, componentCount: msg.componentCount, styleCount: msg.styleCount, sectionCount: msg.sectionCount, variantCount: msg.variantCount });
           break;
 
         case 'IMPORT_ERROR':
@@ -208,6 +208,12 @@ function App() {
               <div class="stat">
                 <span class="stat-value">{result.sectionCount}</span>
                 <span class="stat-label">Sections</span>
+              </div>
+            )}
+            {result.variantCount && result.variantCount > 0 && (
+              <div class="stat">
+                <span class="stat-value">{result.variantCount}</span>
+                <span class="stat-label">Variants</span>
               </div>
             )}
           </div>

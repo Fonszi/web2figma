@@ -269,6 +269,49 @@ function detectFonts(): DetectedFont[] {
   }));
 }
 
+// ============================================================
+// Viewport emulation — constrains page width for multi-viewport extraction.
+// ============================================================
+
+const VIEWPORT_STYLE_ID = 'forge-viewport-override';
+const REFLOW_DELAY_MS = 300;
+
+/**
+ * Inject a style element constraining page width to emulate a narrower viewport.
+ * Waits for CSS reflow before resolving.
+ */
+export function emulateViewport(width: number): Promise<void> {
+  return new Promise((resolve) => {
+    let style = document.getElementById(VIEWPORT_STYLE_ID) as HTMLStyleElement | null;
+    if (!style) {
+      style = document.createElement('style');
+      style.id = VIEWPORT_STYLE_ID;
+      document.head.appendChild(style);
+    }
+    style.textContent = `html { max-width: ${width}px !important; overflow-x: hidden !important; }`;
+    setTimeout(resolve, REFLOW_DELAY_MS);
+  });
+}
+
+/**
+ * Remove the viewport emulation style element, restoring original layout.
+ */
+export function restoreViewport(): void {
+  const style = document.getElementById(VIEWPORT_STYLE_ID);
+  if (style) style.remove();
+}
+
+/**
+ * Extract page at a specific emulated viewport width.
+ * Injects width constraint, extracts, and overrides viewport dimensions in the result.
+ */
+export async function extractPageAtViewport(width: number, height: number): Promise<ExtractionResult> {
+  await emulateViewport(width);
+  const result = await extractPage();
+  result.viewport = { width, height };
+  return result;
+}
+
 // Listen for extraction requests from popup/service worker
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message.type === 'EXTRACT_PAGE') {
@@ -276,5 +319,16 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       .then((result) => sendResponse({ type: 'EXTRACTION_COMPLETE', result }))
       .catch((error) => sendResponse({ type: 'EXTRACTION_ERROR', error: String(error) }));
     return true; // Keep message channel open for async response
+  }
+  if (message.type === 'EXTRACT_AT_VIEWPORT') {
+    extractPageAtViewport(message.width, message.height)
+      .then((result) => sendResponse({ type: 'EXTRACTION_COMPLETE', result }))
+      .catch((error) => sendResponse({ type: 'EXTRACTION_ERROR', error: String(error) }));
+    return true;
+  }
+  if (message.type === 'RESTORE_VIEWPORT') {
+    restoreViewport();
+    sendResponse({ type: 'ok' });
+    return false;
   }
 });

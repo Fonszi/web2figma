@@ -148,6 +148,17 @@ export interface MockSectionNode {
   children: unknown[];
 }
 
+export interface MockComponentSetNode {
+  id: string;
+  type: 'COMPONENT_SET';
+  name: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  children: MockComponentNode[];
+}
+
 /** Stores all created mocks for assertions. */
 export const mockStore = {
   paintStyles: [] as MockPaintStyle[],
@@ -162,6 +173,7 @@ export const mockStore = {
   components: [] as MockComponentNode[],
   instances: [] as MockInstanceNode[],
   sections: [] as MockSectionNode[],
+  componentSets: [] as MockComponentSetNode[],
 };
 
 function createMockFrame(): MockFrameNode {
@@ -299,6 +311,7 @@ export function setupFigmaMock(): void {
   mockStore.components = [];
   mockStore.instances = [];
   mockStore.sections = [];
+  mockStore.componentSets = [];
 
   const figmaMock = {
     createFrame: vi.fn(() => createMockFrame()),
@@ -396,6 +409,30 @@ export function setupFigmaMock(): void {
         mockStore.variables.push(variable);
         return variable;
       }),
+    },
+
+    combineAsVariants: vi.fn((components: MockComponentNode[], _parent: unknown) => {
+      const componentSet: MockComponentSetNode = {
+        id: nextId(),
+        type: 'COMPONENT_SET',
+        name: '',
+        x: 0,
+        y: 0,
+        width: Math.max(...components.map((c) => c.width), 0),
+        height: components.reduce((sum, c) => sum + c.height, 0),
+        children: components,
+      };
+      mockStore.componentSets.push(componentSet);
+      return componentSet;
+    }),
+
+    viewport: {
+      center: { x: 0, y: 0 },
+      scrollAndZoomIntoView: vi.fn(),
+    },
+
+    currentPage: {
+      selection: [] as unknown[],
     },
 
     ui: {

@@ -31,3 +31,10 @@ export const MAX_INLINE_IMAGE_SIZE = 100_000; // 100KB
 export const STORAGE_KEY_EXTRACTION = 'forge_extraction';
 export const STORAGE_KEY_SETTINGS = 'forge_settings';
 export const STORAGE_KEY_USAGE = 'forge_usage';
+export const STORAGE_KEY_SELECTED_VIEWPORTS = 'forge_selected_viewports';
+
+/** Viewport preset keys for multi-viewport extraction. */
+export type ViewportPreset = keyof typeof VIEWPORTS;
+
+/** Default selected viewports (single desktop for backward compatibility). */
+export const DEFAULT_SELECTED_VIEWPORTS: ViewportPreset[] = ['desktop'];

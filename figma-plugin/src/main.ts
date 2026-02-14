@@ -23,6 +23,8 @@ import type { ExtractionResult, ImportSettings } from '../../shared/types';
 import { DEFAULT_SETTINGS } from '../../shared/types';
 import { convertToFigma } from './converter';
 import { handleImageDataFromUi } from './nodes/image';
+import { isMultiViewport } from '../../shared/types';
+import { createViewportVariants } from './components/variants';
 
 figma.showUI(__html__, { width: UI_WIDTH, height: UI_HEIGHT, themeColors: true });
 
@@ -75,9 +77,33 @@ async function handleImport(json: string): Promise<void> {
   try {
     sendToUi({ type: 'IMPORT_PROGRESS', phase: 'parsing', progress: 0, message: 'Parsing extraction...' });
 
-    const result: ExtractionResult = JSON.parse(json);
+    const parsed = JSON.parse(json);
     const settings = await loadSettings();
 
+    if (isMultiViewport(parsed)) {
+      // Multi-viewport: create ComponentSet with viewport variants
+      const variantResult = await createViewportVariants(
+        parsed,
+        settings,
+        (phase, progress, message) => {
+          sendToUi({ type: 'IMPORT_PROGRESS', phase, progress, message });
+        },
+      );
+
+      sendToUi({
+        type: 'IMPORT_COMPLETE',
+        nodeCount: variantResult.totalNodeCount,
+        tokenCount: variantResult.totalTokenCount,
+        componentCount: variantResult.totalComponentCount,
+        styleCount: variantResult.totalStyleCount,
+        sectionCount: variantResult.totalSectionCount,
+        variantCount: variantResult.variantCount,
+      });
+      return;
+    }
+
+    // Single viewport: existing path
+    const result: ExtractionResult = parsed;
     const { nodeCount, tokenCount, componentCount, styleCount, sectionCount } = await convertToFigma(
       result,
       settings,

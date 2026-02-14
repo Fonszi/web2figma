@@ -23,7 +23,7 @@ export type UiToSandboxMessage =
 
 export type SandboxToUiMessage =
   | { type: 'IMPORT_PROGRESS'; phase: ImportPhase; progress: number; message: string }
-  | { type: 'IMPORT_COMPLETE'; nodeCount: number; tokenCount: number; componentCount: number; styleCount: number; sectionCount: number }
+  | { type: 'IMPORT_COMPLETE'; nodeCount: number; tokenCount: number; componentCount: number; styleCount: number; sectionCount: number; variantCount?: number }
   | { type: 'IMPORT_ERROR'; error: string }
   | { type: 'SETTINGS_LOADED'; settings: ImportSettings };
 
@@ -33,6 +33,7 @@ export type ImportPhase =
   | 'creating-styles'
   | 'creating-components'
   | 'creating-sections'
+  | 'creating-variants'
   | 'loading-images'
   | 'finalizing';
 
@@ -42,6 +43,7 @@ export const PHASE_LABELS: Record<ImportPhase, string> = {
   'creating-styles': 'Creating design tokens...',
   'creating-components': 'Detecting components...',
   'creating-sections': 'Organizing sections...',
+  'creating-variants': 'Creating viewport variants...',
   'loading-images': 'Loading images...',
   finalizing: 'Finalizing import...',
 };
@@ -50,6 +52,8 @@ export const PHASE_LABELS: Record<ImportPhase, string> = {
 
 export type ExtensionMessage =
   | { type: 'EXTRACT_PAGE' }
+  | { type: 'EXTRACT_AT_VIEWPORT'; width: number; height: number }
+  | { type: 'RESTORE_VIEWPORT' }
   | { type: 'EXTRACTION_COMPLETE'; result: ExtractionResult }
   | { type: 'EXTRACTION_ERROR'; error: string }
   | { type: 'EXTRACTION_PROGRESS'; phase: string; progress: number }
