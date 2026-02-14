@@ -14,6 +14,7 @@
 import { STORAGE_KEY_EXTRACTION } from '../../../shared/constants';
 import type { ExtensionMessage } from '../../../shared/messages';
 import type { ExtractionResult } from '../../../shared/types';
+import { captureExtensionError } from '../../../shared/monitor';
 
 /** Cache the latest extraction in memory for quick access. */
 let latestExtraction: ExtractionResult | null = null;
@@ -31,6 +32,7 @@ chrome.runtime.onMessage.addListener(
 
       case 'EXTRACTION_ERROR':
         console.error('[forge] Extraction error:', message.error);
+        captureExtensionError(message.error ?? 'Unknown extraction error', 'extractionRelay');
         break;
 
       case 'GET_EXTRACTION':
@@ -72,9 +74,11 @@ async function handleExtractPage(
     const response = await chrome.tabs.sendMessage(tab.id, { type: 'EXTRACT_PAGE' });
     sendResponse(response);
   } catch (error) {
+    const msg = error instanceof Error ? error.message : 'Failed to extract page';
+    captureExtensionError(msg, 'handleExtractPage', error instanceof Error ? error : null);
     sendResponse({
       type: 'EXTRACTION_ERROR',
-      error: error instanceof Error ? error.message : 'Failed to extract page',
+      error: msg,
     });
   }
 }
@@ -104,6 +108,12 @@ async function copyToClipboard(data: string): Promise<void> {
     }
   } catch (error) {
     console.error('[forge] Clipboard copy failed:', error);
+    captureExtensionError(
+      error instanceof Error ? error.message : 'Clipboard copy failed',
+      'copyToClipboard',
+      error instanceof Error ? error : null,
+      'WARNING',
+    );
   }
 }
 

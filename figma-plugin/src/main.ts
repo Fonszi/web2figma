@@ -25,6 +25,7 @@ import { convertToFigma } from './converter';
 import { handleImageDataFromUi } from './nodes/image';
 import { isMultiViewport } from '../../shared/types';
 import { createViewportVariants } from './components/variants';
+import { capturePluginError } from '../../shared/monitor';
 
 figma.showUI(__html__, { width: UI_WIDTH, height: UI_HEIGHT, themeColors: true });
 
@@ -122,6 +123,7 @@ async function handleImport(json: string): Promise<void> {
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to parse extraction data';
+    capturePluginError(message, 'handleImport', error instanceof Error ? error : null);
     sendToUi({ type: 'IMPORT_ERROR', error: message });
   }
 }
