@@ -15,7 +15,7 @@
 import { render } from 'preact';
 import { useState, useEffect, useCallback } from 'preact/hooks';
 import type { ExtractionResult, MultiViewportResult, ViewportExtraction, UsageStats, LicenseInfo } from '../../../shared/types';
-import { VIEWPORTS, STORAGE_KEY_SELECTED_VIEWPORTS, DEFAULT_SELECTED_VIEWPORTS, STORAGE_KEY_USAGE, STORAGE_KEY_LICENSE, FREE_EXTRACTION_LIMIT, STRIPE_CHECKOUT_PRO_URL, STRIPE_CHECKOUT_TEAM_URL, PRICE_PRO_MONTHLY, PRICE_TEAM_PER_SEAT, type ViewportPreset } from '../../../shared/constants';
+import { VIEWPORTS, STORAGE_KEY_SELECTED_VIEWPORTS, DEFAULT_SELECTED_VIEWPORTS, STORAGE_KEY_USAGE, STORAGE_KEY_LICENSE, STORAGE_KEY_SERVER_QUOTA, FREE_EXTRACTION_LIMIT, STRIPE_CHECKOUT_PRO_URL, STRIPE_CHECKOUT_TEAM_URL, PRICE_PRO_MONTHLY, PRICE_TEAM_PER_SEAT, type ViewportPreset } from '../../../shared/constants';
 import { checkRelayHealth, postExtraction } from '../../../shared/relay-client';
 import { getEffectiveTier, getRemainingExtractions, isExtractionLimitReached, needsMonthlyReset, resetUsageForNewMonth, incrementUsage } from '../../../shared/licensing';
 import { ViewportPicker } from './ViewportPicker';
@@ -45,6 +45,7 @@ function App() {
   const [usageStats, setUsageStats] = useState<UsageStats | null>(null);
   const [licenseInfo, setLicenseInfo] = useState<LicenseInfo | null>(null);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [serverQuota, setServerQuota] = useState<{ quotaUsed: number; quotaLimit: number; syncedAt: number } | null>(null);
 
   // Get current tab info, load saved viewport selection, check relay on mount
   useEffect(() => {
@@ -68,10 +69,11 @@ function App() {
       if (saved?.customWidths) setCustomWidths(saved.customWidths);
     });
 
-    // Load usage stats and license
-    chrome.storage.local.get([STORAGE_KEY_USAGE, STORAGE_KEY_LICENSE]).then((data) => {
+    // Load usage stats, license, and server quota
+    chrome.storage.local.get([STORAGE_KEY_USAGE, STORAGE_KEY_LICENSE, STORAGE_KEY_SERVER_QUOTA]).then((data) => {
       if (data[STORAGE_KEY_USAGE]) setUsageStats(data[STORAGE_KEY_USAGE]);
       if (data[STORAGE_KEY_LICENSE]) setLicenseInfo(data[STORAGE_KEY_LICENSE]);
+      if (data[STORAGE_KEY_SERVER_QUOTA]) setServerQuota(data[STORAGE_KEY_SERVER_QUOTA]);
     });
   }, []);
 
@@ -371,21 +373,28 @@ function App() {
       )}
 
       {/* Usage meter (free tier only) */}
-      {tier === 'free' && usageStats && (
-        <div class="usage-meter">
-          <div class="usage-meter-header">
-            <span class="usage-meter-label">
-              {getRemainingExtractions(usageStats)} of {FREE_EXTRACTION_LIMIT} free extractions remaining
-            </span>
+      {tier === 'free' && usageStats && (() => {
+        const SERVER_QUOTA_FRESH_MS = 5 * 60 * 1000;
+        const useServer = serverQuota && serverQuota.quotaLimit > 0 && (Date.now() - serverQuota.syncedAt) < SERVER_QUOTA_FRESH_MS;
+        const used = useServer ? serverQuota.quotaUsed : usageStats.extractionsThisMonth;
+        const limit = useServer ? serverQuota.quotaLimit : FREE_EXTRACTION_LIMIT;
+        const remaining = Math.max(0, limit - used);
+        return (
+          <div class="usage-meter">
+            <div class="usage-meter-header">
+              <span class="usage-meter-label">
+                {remaining} of {limit} free extractions remaining
+              </span>
+            </div>
+            <div class="usage-meter-bar">
+              <div
+                class={`usage-meter-fill ${used >= limit ? 'exhausted' : used >= limit * 0.8 ? 'warning' : ''}`}
+                style={{ width: `${Math.min(100, (used / limit) * 100)}%` }}
+              />
+            </div>
           </div>
-          <div class="usage-meter-bar">
-            <div
-              class={`usage-meter-fill ${usageStats.extractionsThisMonth >= FREE_EXTRACTION_LIMIT ? 'exhausted' : usageStats.extractionsThisMonth >= FREE_EXTRACTION_LIMIT * 0.8 ? 'warning' : ''}`}
-              style={{ width: `${Math.min(100, (usageStats.extractionsThisMonth / FREE_EXTRACTION_LIMIT) * 100)}%` }}
-            />
-          </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Viewport picker */}
       <ViewportPicker

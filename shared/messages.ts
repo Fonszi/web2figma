@@ -89,4 +89,5 @@ export type ExtensionMessage =
   | { type: 'EXTRACTION_PROGRESS'; phase: string; progress: number }
   | { type: 'GET_EXTRACTION' }
   | { type: 'COPY_TO_CLIPBOARD'; data: string }
-  | { type: 'GET_USAGE' };
+  | { type: 'GET_USAGE' }
+  | { type: 'GET_SERVER_QUOTA' };

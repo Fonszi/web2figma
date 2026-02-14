@@ -22,6 +22,7 @@ import type { UiToSandboxMessage, SandboxToUiMessage } from '../../shared/messag
 import type { ExtractionResult, ImportSettings, LicenseInfo } from '../../shared/types';
 import { DEFAULT_SETTINGS } from '../../shared/types';
 import { isValidLicenseKeyFormat, isLicenseCacheValid, getEffectiveTier, applyTierToSettings } from '../../shared/licensing';
+import { activateLicense, logConversion } from '../../shared/api-client';
 import { convertToFigma } from './converter';
 import { handleImageDataFromUi } from './nodes/image';
 import { isMultiViewport } from '../../shared/types';
@@ -98,14 +99,20 @@ figma.ui.onmessage = async (msg: UiToSandboxMessage & { type: string; nodeId?: s
         sendToUi({ type: 'LICENSE_LOADED', license: null, tier: 'free' });
         break;
       }
+      // Server validation (fallback to 'pro' if unreachable)
+      let tier: 'free' | 'pro' | 'team' = 'pro';
+      const serverResult = await activateLicense(key, 'forge', 'figma');
+      if (serverResult) {
+        tier = serverResult.tier as 'free' | 'pro' | 'team';
+      }
       const license: LicenseInfo = {
         key,
-        tier: 'pro',
+        tier,
         validUntil: Date.now() + LICENSE_CACHE_MS,
         cachedAt: Date.now(),
       };
       await saveLicense(license);
-      sendToUi({ type: 'LICENSE_LOADED', license, tier: 'pro' });
+      sendToUi({ type: 'LICENSE_LOADED', license, tier });
       break;
     }
 
@@ -150,6 +157,12 @@ async function handleImport(json: string): Promise<void> {
         sectionCount: variantResult.totalSectionCount,
         variantCount: variantResult.variantCount,
       });
+      logConversionAfterImport(license, {
+        nodeCount: variantResult.totalNodeCount,
+        tokenCount: variantResult.totalTokenCount,
+        componentCount: variantResult.totalComponentCount,
+        viewportCount: variantResult.variantCount ?? 1,
+      });
       return;
     }
 
@@ -171,6 +184,7 @@ async function handleImport(json: string): Promise<void> {
       styleCount,
       sectionCount,
     });
+    logConversionAfterImport(license, { nodeCount, tokenCount, componentCount });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to parse extraction data';
     capturePluginError(message, 'handleImport', error instanceof Error ? error : null);
@@ -283,6 +297,25 @@ async function handleApplyDiff(msg: { changeIds: string[]; mode: 'update-changed
     capturePluginError(message, 'handleApplyDiff', error instanceof Error ? error : null);
     sendToUi({ type: 'IMPORT_ERROR', error: message });
   }
+}
+
+/** Fire-and-forget: log conversion metrics to the backend. */
+function logConversionAfterImport(
+  license: LicenseInfo | null,
+  metrics: { nodeCount: number; tokenCount: number; componentCount: number; viewportCount?: number },
+): void {
+  logConversion(
+    {
+      sourceType: 'figma',
+      nodeCount: metrics.nodeCount,
+      tokenCount: metrics.tokenCount,
+      componentCount: metrics.componentCount,
+      viewportCount: metrics.viewportCount ?? 1,
+    },
+    license?.key,
+  ).catch(() => {
+    // Best-effort — fail silently
+  });
 }
 
 // Initialize

@@ -56,6 +56,19 @@ export const RELAY_HEALTH_ENDPOINT = '/health';
 export const RELAY_EXTRACTION_ENDPOINT = '/extraction';
 
 // ============================================================
+// Backend API
+// ============================================================
+
+/** Base URL for the Fonszi backend API. */
+export const API_BASE_URL = 'https://api.fonszi.com';
+
+/** API request timeout in milliseconds. */
+export const API_TIMEOUT_MS = 5000;
+
+/** Chrome storage key for server-side quota cache. */
+export const STORAGE_KEY_SERVER_QUOTA = 'forge_server_quota';
+
+// ============================================================
 // Licensing & Monetization
 // ============================================================
 

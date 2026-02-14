@@ -11,10 +11,16 @@
  * - Constants: shared/constants.ts
  */
 
-import { STORAGE_KEY_EXTRACTION, STORAGE_KEY_USAGE } from '../../../shared/constants';
+import {
+  STORAGE_KEY_EXTRACTION,
+  STORAGE_KEY_USAGE,
+  STORAGE_KEY_LICENSE,
+  STORAGE_KEY_SERVER_QUOTA,
+} from '../../../shared/constants';
 import type { ExtensionMessage } from '../../../shared/messages';
-import type { ExtractionResult, UsageStats } from '../../../shared/types';
+import type { ExtractionResult, UsageStats, LicenseInfo } from '../../../shared/types';
 import { needsMonthlyReset, resetUsageForNewMonth, incrementUsage } from '../../../shared/licensing';
+import { trackUsage } from '../../../shared/api-client';
 import { captureExtensionError } from '../../../shared/monitor';
 
 /** Cache the latest extraction in memory for quick access. */
@@ -43,6 +49,12 @@ chrome.runtime.onMessage.addListener(
       case 'GET_USAGE':
         chrome.storage.local.get(STORAGE_KEY_USAGE).then((data) => {
           sendResponse(data[STORAGE_KEY_USAGE] ?? null);
+        });
+        return true; // async response
+
+      case 'GET_SERVER_QUOTA':
+        chrome.storage.local.get(STORAGE_KEY_SERVER_QUOTA).then((data) => {
+          sendResponse(data[STORAGE_KEY_SERVER_QUOTA] ?? null);
         });
         return true; // async response
 
@@ -100,6 +112,7 @@ function handleExtractionComplete(result: ExtractionResult): void {
     console.error('[forge] Failed to store extraction:', err);
   });
   incrementUsageCounter();
+  syncUsageToServer();
 }
 
 /**
@@ -118,6 +131,31 @@ async function incrementUsageCounter(): Promise<void> {
     await chrome.storage.local.set({ [STORAGE_KEY_USAGE]: stats });
   } catch (err) {
     console.error('[forge] Failed to update usage counter:', err);
+  }
+}
+
+/**
+ * Fire-and-forget: sync usage event to the backend.
+ * Stores the returned quota in chrome.storage for the popup to display.
+ */
+async function syncUsageToServer(): Promise<void> {
+  try {
+    const data = await chrome.storage.local.get(STORAGE_KEY_LICENSE);
+    const license = data[STORAGE_KEY_LICENSE] as LicenseInfo | undefined;
+    const licenseKey = license?.key;
+
+    const result = await trackUsage('forge', 'extraction', licenseKey);
+    if (result) {
+      await chrome.storage.local.set({
+        [STORAGE_KEY_SERVER_QUOTA]: {
+          quotaUsed: result.quotaUsed,
+          quotaLimit: result.quotaLimit,
+          syncedAt: Date.now(),
+        },
+      });
+    }
+  } catch {
+    // Server sync is best-effort — fail silently
   }
 }
 
