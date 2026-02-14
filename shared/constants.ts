@@ -54,3 +54,33 @@ export const RELAY_HEALTH_ENDPOINT = '/health';
 
 /** Relay extraction data endpoint. */
 export const RELAY_EXTRACTION_ENDPOINT = '/extraction';
+
+// ============================================================
+// Licensing & Monetization
+// ============================================================
+
+/** Chrome storage key for license info. */
+export const STORAGE_KEY_LICENSE = 'forge_license';
+
+/** License key format: FORGE-XXXX-XXXX-XXXX-XXXX (A-Z0-9). */
+export const LICENSE_KEY_REGEX = /^FORGE-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$/;
+
+/** License cache duration — 30 days in ms. */
+export const LICENSE_CACHE_MS = 30 * 24 * 60 * 60 * 1000;
+
+/** Stripe checkout URLs (placeholders until backend is live). */
+export const STRIPE_CHECKOUT_PRO_URL = 'https://buy.stripe.com/forge-pro-placeholder';
+export const STRIPE_CHECKOUT_TEAM_URL = 'https://buy.stripe.com/forge-team-placeholder';
+
+/** Pricing display constants. */
+export const PRICE_PRO_MONTHLY = 12;
+export const PRICE_TEAM_PER_SEAT = 9;
+
+/** Pro-only features. Free tier gets: single viewport, basic frames/text/images. */
+export const PRO_FEATURES: readonly string[] = [
+  'multi-viewport',
+  'design-tokens',
+  'components',
+  'framer-aware',
+  'variables',
+] as const;

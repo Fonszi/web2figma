@@ -478,7 +478,25 @@ export function setupFigmaMock(): void {
     ui: {
       postMessage: vi.fn(),
     },
+
+    clientStorage: {
+      _data: {} as Record<string, unknown>,
+      getAsync: vi.fn(async function (this: { _data: Record<string, unknown> }, key: string) {
+        return this._data[key] ?? undefined;
+      }),
+      setAsync: vi.fn(async function (this: { _data: Record<string, unknown> }, key: string, value: unknown) {
+        this._data[key] = value;
+      }),
+      deleteAsync: vi.fn(async function (this: { _data: Record<string, unknown> }, key: string) {
+        delete this._data[key];
+      }),
+    },
   };
+
+  // Bind clientStorage methods to their owner
+  figmaMock.clientStorage.getAsync = figmaMock.clientStorage.getAsync.bind(figmaMock.clientStorage);
+  figmaMock.clientStorage.setAsync = figmaMock.clientStorage.setAsync.bind(figmaMock.clientStorage);
+  figmaMock.clientStorage.deleteAsync = figmaMock.clientStorage.deleteAsync.bind(figmaMock.clientStorage);
 
   (globalThis as Record<string, unknown>).figma = figmaMock;
 }

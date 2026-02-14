@@ -234,3 +234,29 @@ export type ImportPayload = ExtractionResult | MultiViewportResult;
 export function isMultiViewport(payload: ImportPayload): payload is MultiViewportResult {
   return 'type' in payload && (payload as MultiViewportResult).type === 'multi-viewport';
 }
+
+// ============================================================
+// Licensing & Usage — Free tier, Pro/Team plans, usage tracking.
+// ============================================================
+
+export type Tier = 'free' | 'pro' | 'team';
+
+export type ProFeature =
+  | 'multi-viewport'
+  | 'design-tokens'
+  | 'components'
+  | 'framer-aware'
+  | 'variables';
+
+export interface LicenseInfo {
+  key: string;
+  tier: Tier;
+  validUntil: number;   // Unix timestamp (ms)
+  cachedAt: number;      // When the license was last validated
+}
+
+export interface UsageStats {
+  extractionsThisMonth: number;
+  monthKey: string;          // "YYYY-MM" format for calendar month reset
+  lastExtractionAt: number;  // Unix timestamp (ms)
+}

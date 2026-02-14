@@ -11,7 +11,7 @@
 //   Used in: extension/src/popup/Popup.tsx, extension/src/background/service-worker.ts
 // ============================================================
 
-import type { ExtractionResult, ImportSettings } from './types';
+import type { ExtractionResult, ImportSettings, LicenseInfo, Tier } from './types';
 
 // --- Channel 1: Figma Plugin UI ↔ Sandbox ---
 
@@ -21,7 +21,9 @@ export type UiToSandboxMessage =
   | { type: 'APPLY_DIFF'; changeIds: string[]; mode: 'update-changed' | 'full-reimport' }
   | { type: 'CANCEL_IMPORT' }
   | { type: 'UPDATE_SETTINGS'; settings: Partial<ImportSettings> }
-  | { type: 'RESIZE_UI'; width: number; height: number };
+  | { type: 'RESIZE_UI'; width: number; height: number }
+  | { type: 'SET_LICENSE'; key: string }
+  | { type: 'CLEAR_LICENSE' };
 
 export type SandboxToUiMessage =
   | { type: 'IMPORT_PROGRESS'; phase: ImportPhase; progress: number; message: string }
@@ -29,7 +31,8 @@ export type SandboxToUiMessage =
   | { type: 'IMPORT_ERROR'; error: string }
   | { type: 'SETTINGS_LOADED'; settings: ImportSettings }
   | { type: 'DIFF_RESULT'; changes: DiffChange[]; summary: DiffSummary }
-  | { type: 'REIMPORT_COMPLETE'; updatedCount: number; addedCount: number; removedCount: number };
+  | { type: 'REIMPORT_COMPLETE'; updatedCount: number; addedCount: number; removedCount: number }
+  | { type: 'LICENSE_LOADED'; license: LicenseInfo | null; tier: Tier };
 
 export type ImportPhase =
   | 'parsing'
@@ -85,4 +88,5 @@ export type ExtensionMessage =
   | { type: 'EXTRACTION_ERROR'; error: string }
   | { type: 'EXTRACTION_PROGRESS'; phase: string; progress: number }
   | { type: 'GET_EXTRACTION' }
-  | { type: 'COPY_TO_CLIPBOARD'; data: string };
+  | { type: 'COPY_TO_CLIPBOARD'; data: string }
+  | { type: 'GET_USAGE' };

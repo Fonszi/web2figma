@@ -211,6 +211,31 @@
     .btn-full-reimport:hover { background: var(--bg-input); }
     .btn-cancel { flex: 1; padding: 8px; background: transparent; color: var(--text-muted); border: 1px solid var(--border); border-radius: var(--radius); font-size: 12px; cursor: pointer; }
     .btn-cancel:hover { background: var(--bg-input); }
+
+    /* License section */
+    .license-section { display: flex; flex-direction: column; gap: 6px; }
+    .license-status { display: flex; justify-content: space-between; align-items: center; }
+    .license-tier-label { font-size: 11px; color: var(--text-secondary); display: flex; align-items: center; gap: 4px; }
+    .pro-badge { font-size: 9px; font-weight: 700; text-transform: uppercase; background: var(--accent); color: white; padding: 1px 4px; border-radius: 3px; line-height: 1.2; }
+    .btn-license-enter, .btn-license-remove {
+      padding: 3px 8px; background: transparent; color: var(--text-muted);
+      border: 1px solid var(--border); border-radius: 4px; font-size: 10px; cursor: pointer;
+    }
+    .btn-license-enter:hover, .btn-license-remove:hover { background: var(--bg-input); color: var(--text-secondary); }
+    .license-input-row { display: flex; gap: 4px; }
+    .license-key-input {
+      flex: 1; padding: 5px 8px; background: var(--bg-input); color: var(--text);
+      border: 1px solid var(--border); border-radius: 4px; font-size: 11px;
+      font-family: "SF Mono", "Fira Code", monospace; outline: none;
+    }
+    .license-key-input:focus { border-color: var(--accent); }
+    .license-key-input::placeholder { color: var(--text-muted); }
+    .btn-license-activate {
+      padding: 5px 10px; background: var(--accent); color: white;
+      border: none; border-radius: 4px; font-size: 11px; font-weight: 600; cursor: pointer;
+    }
+    .btn-license-activate:hover { background: var(--accent-hover); }
+    .license-error { font-size: 10px; color: var(--error); }
   </style>
 </head>
 <body>

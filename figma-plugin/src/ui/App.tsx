@@ -15,8 +15,9 @@ import { render } from 'preact';
 import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
 import type { SandboxToUiMessage, ImportPhase, DiffChange, DiffSummary } from '../../../shared/messages';
 import { PHASE_LABELS } from '../../../shared/messages';
-import type { ImportSettings, ExtractionResult } from '../../../shared/types';
+import type { ImportSettings, ExtractionResult, LicenseInfo, Tier } from '../../../shared/types';
 import { DEFAULT_SETTINGS } from '../../../shared/types';
+import { getEffectiveTier, isValidLicenseKeyFormat } from '../../../shared/licensing';
 import { checkRelayHealth, fetchExtraction } from '../../../shared/relay-client';
 import { TokenPanel } from './components/TokenPanel';
 import { ComponentPanel } from './components/ComponentPanel';
@@ -37,7 +38,13 @@ function App() {
   const [diffChanges, setDiffChanges] = useState<DiffChange[]>([]);
   const [diffSummary, setDiffSummary] = useState<DiffSummary | null>(null);
   const [reimportResult, setReimportResult] = useState<{ updatedCount: number; addedCount: number; removedCount: number } | null>(null);
+  const [license, setLicense] = useState<LicenseInfo | null>(null);
+  const [showLicenseInput, setShowLicenseInput] = useState(false);
+  const [licenseKeyInput, setLicenseKeyInput] = useState('');
+  const [licenseError, setLicenseError] = useState<string | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const tier: Tier = getEffectiveTier(license);
 
   // Check relay health on mount
   useEffect(() => {
@@ -82,6 +89,10 @@ function App() {
         case 'REIMPORT_COMPLETE':
           setState('done');
           setReimportResult({ updatedCount: msg.updatedCount, addedCount: msg.addedCount, removedCount: msg.removedCount });
+          break;
+
+        case 'LICENSE_LOADED':
+          setLicense(msg.license);
           break;
       }
     };
@@ -185,6 +196,22 @@ function App() {
     setProgress(0);
   }, []);
 
+  const handleSetLicense = useCallback(() => {
+    const key = licenseKeyInput.trim().toUpperCase();
+    if (!isValidLicenseKeyFormat(key)) {
+      setLicenseError('Invalid license key format');
+      return;
+    }
+    setLicenseError(null);
+    parent.postMessage({ pluginMessage: { type: 'SET_LICENSE', key } }, '*');
+    setShowLicenseInput(false);
+    setLicenseKeyInput('');
+  }, [licenseKeyInput]);
+
+  const handleClearLicense = useCallback(() => {
+    parent.postMessage({ pluginMessage: { type: 'CLEAR_LICENSE' } }, '*');
+  }, []);
+
   const isValidJson = json.trim().length > 0 && (() => {
     try { JSON.parse(json); return true; } catch { return false; }
   })();
@@ -199,6 +226,46 @@ function App() {
         <span class="version">v0.1.0</span>
         <span class={`relay-status ${relayAvailable ? 'relay-connected' : ''}`} title={relayAvailable ? 'Relay connected' : 'Relay offline'} />
       </div>
+
+      {/* License section */}
+      {state === 'idle' && (
+        <div class="license-section">
+          {tier === 'free' ? (
+            <>
+              <div class="license-status">
+                <span class="license-tier-label">Free tier</span>
+                <button class="btn-license-enter" onClick={() => setShowLicenseInput(!showLicenseInput)}>
+                  {showLicenseInput ? 'Cancel' : 'Enter license key'}
+                </button>
+              </div>
+              {showLicenseInput && (
+                <div class="license-input-row">
+                  <input
+                    type="text"
+                    class="license-key-input"
+                    placeholder="FORGE-XXXX-XXXX-XXXX-XXXX"
+                    value={licenseKeyInput}
+                    onInput={(e) => {
+                      setLicenseKeyInput((e.target as HTMLInputElement).value);
+                      setLicenseError(null);
+                    }}
+                    onKeyDown={(e) => { if (e.key === 'Enter') handleSetLicense(); }}
+                  />
+                  <button class="btn-license-activate" onClick={handleSetLicense}>Activate</button>
+                </div>
+              )}
+              {licenseError && <div class="license-error">{licenseError}</div>}
+            </>
+          ) : (
+            <div class="license-status">
+              <span class="license-tier-label">
+                <span class="pro-badge">{tier.toUpperCase()}</span> plan active
+              </span>
+              <button class="btn-license-remove" onClick={handleClearLicense}>Remove</button>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Idle: JSON input */}
       {state === 'idle' && (

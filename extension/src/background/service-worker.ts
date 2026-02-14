@@ -11,9 +11,10 @@
  * - Constants: shared/constants.ts
  */
 
-import { STORAGE_KEY_EXTRACTION } from '../../../shared/constants';
+import { STORAGE_KEY_EXTRACTION, STORAGE_KEY_USAGE } from '../../../shared/constants';
 import type { ExtensionMessage } from '../../../shared/messages';
-import type { ExtractionResult } from '../../../shared/types';
+import type { ExtractionResult, UsageStats } from '../../../shared/types';
+import { needsMonthlyReset, resetUsageForNewMonth, incrementUsage } from '../../../shared/licensing';
 import { captureExtensionError } from '../../../shared/monitor';
 
 /** Cache the latest extraction in memory for quick access. */
@@ -38,6 +39,12 @@ chrome.runtime.onMessage.addListener(
       case 'GET_EXTRACTION':
         sendResponse(latestExtraction);
         return false; // sync response
+
+      case 'GET_USAGE':
+        chrome.storage.local.get(STORAGE_KEY_USAGE).then((data) => {
+          sendResponse(data[STORAGE_KEY_USAGE] ?? null);
+        });
+        return true; // async response
 
       case 'COPY_TO_CLIPBOARD':
         // Content script handles clipboard — relay to active tab
@@ -85,12 +92,33 @@ async function handleExtractPage(
 
 /**
  * Store extraction result in memory and chrome.storage.local.
+ * Also increments the usage counter for free tier tracking.
  */
 function handleExtractionComplete(result: ExtractionResult): void {
   latestExtraction = result;
   chrome.storage.local.set({ [STORAGE_KEY_EXTRACTION]: result }).catch((err) => {
     console.error('[forge] Failed to store extraction:', err);
   });
+  incrementUsageCounter();
+}
+
+/**
+ * Increment the extraction usage counter in chrome.storage.local.
+ */
+async function incrementUsageCounter(): Promise<void> {
+  try {
+    const data = await chrome.storage.local.get(STORAGE_KEY_USAGE);
+    let stats: UsageStats = data[STORAGE_KEY_USAGE] ?? resetUsageForNewMonth();
+
+    if (needsMonthlyReset(stats)) {
+      stats = resetUsageForNewMonth();
+    }
+
+    stats = incrementUsage(stats);
+    await chrome.storage.local.set({ [STORAGE_KEY_USAGE]: stats });
+  } catch (err) {
+    console.error('[forge] Failed to update usage counter:', err);
+  }
 }
 
 /**

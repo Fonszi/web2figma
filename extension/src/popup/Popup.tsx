@@ -14,9 +14,10 @@
 
 import { render } from 'preact';
 import { useState, useEffect, useCallback } from 'preact/hooks';
-import type { ExtractionResult, MultiViewportResult, ViewportExtraction } from '../../../shared/types';
-import { VIEWPORTS, STORAGE_KEY_SELECTED_VIEWPORTS, DEFAULT_SELECTED_VIEWPORTS, type ViewportPreset } from '../../../shared/constants';
+import type { ExtractionResult, MultiViewportResult, ViewportExtraction, UsageStats, LicenseInfo } from '../../../shared/types';
+import { VIEWPORTS, STORAGE_KEY_SELECTED_VIEWPORTS, DEFAULT_SELECTED_VIEWPORTS, STORAGE_KEY_USAGE, STORAGE_KEY_LICENSE, FREE_EXTRACTION_LIMIT, STRIPE_CHECKOUT_PRO_URL, STRIPE_CHECKOUT_TEAM_URL, PRICE_PRO_MONTHLY, PRICE_TEAM_PER_SEAT, type ViewportPreset } from '../../../shared/constants';
 import { checkRelayHealth, postExtraction } from '../../../shared/relay-client';
+import { getEffectiveTier, getRemainingExtractions, isExtractionLimitReached, needsMonthlyReset, resetUsageForNewMonth, incrementUsage } from '../../../shared/licensing';
 import { ViewportPicker } from './ViewportPicker';
 
 interface TabInfo {
@@ -41,6 +42,9 @@ function App() {
   const [extractionProgress, setExtractionProgress] = useState('');
   const [relayAvailable, setRelayAvailable] = useState(false);
   const [relaySent, setRelaySent] = useState(false);
+  const [usageStats, setUsageStats] = useState<UsageStats | null>(null);
+  const [licenseInfo, setLicenseInfo] = useState<LicenseInfo | null>(null);
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
 
   // Get current tab info, load saved viewport selection, check relay on mount
   useEffect(() => {
@@ -63,6 +67,12 @@ function App() {
       if (saved?.presets) setSelectedViewports(saved.presets);
       if (saved?.customWidths) setCustomWidths(saved.customWidths);
     });
+
+    // Load usage stats and license
+    chrome.storage.local.get([STORAGE_KEY_USAGE, STORAGE_KEY_LICENSE]).then((data) => {
+      if (data[STORAGE_KEY_USAGE]) setUsageStats(data[STORAGE_KEY_USAGE]);
+      if (data[STORAGE_KEY_LICENSE]) setLicenseInfo(data[STORAGE_KEY_LICENSE]);
+    });
   }, []);
 
   const handleViewportChange = useCallback((presets: ViewportPreset[], customs: number[]) => {
@@ -75,7 +85,27 @@ function App() {
 
   const getTotalViewportCount = () => selectedViewports.length + customWidths.length;
 
+  const tier = getEffectiveTier(licenseInfo);
+
   const handleExtract = useCallback(async () => {
+    // Pre-extraction checks for free tier
+    const currentTier = getEffectiveTier(licenseInfo);
+    if (currentTier === 'free') {
+      let stats = usageStats ?? resetUsageForNewMonth();
+      if (needsMonthlyReset(stats)) {
+        stats = resetUsageForNewMonth();
+        setUsageStats(stats);
+      }
+      if (isExtractionLimitReached(stats)) {
+        setShowUpgradeModal(true);
+        return;
+      }
+      if (getTotalViewportCount() > 1) {
+        setShowUpgradeModal(true);
+        return;
+      }
+    }
+
     setState('extracting');
     setError(null);
     setResult(null);
@@ -123,6 +153,12 @@ function App() {
           setExtractionTime(Date.now() - startTime);
           setState('done');
           await chrome.storage.local.set({ forge_extraction: extraction });
+
+          // Update local usage stats
+          let stats = usageStats ?? resetUsageForNewMonth();
+          if (needsMonthlyReset(stats)) stats = resetUsageForNewMonth();
+          stats = incrementUsage(stats);
+          setUsageStats(stats);
 
           // Auto-POST to relay (fire-and-forget)
           if (relayAvailable) {
@@ -198,6 +234,12 @@ function App() {
         setExtractionTime(Date.now() - startTime);
         setState('done');
         await chrome.storage.local.set({ forge_extraction: multi });
+
+        // Update local usage stats
+        let stats = usageStats ?? resetUsageForNewMonth();
+        if (needsMonthlyReset(stats)) stats = resetUsageForNewMonth();
+        stats = incrementUsage(stats);
+        setUsageStats(stats);
 
         // Auto-POST to relay (fire-and-forget)
         if (relayAvailable) {
@@ -328,12 +370,30 @@ function App() {
         </div>
       )}
 
+      {/* Usage meter (free tier only) */}
+      {tier === 'free' && usageStats && (
+        <div class="usage-meter">
+          <div class="usage-meter-header">
+            <span class="usage-meter-label">
+              {getRemainingExtractions(usageStats)} of {FREE_EXTRACTION_LIMIT} free extractions remaining
+            </span>
+          </div>
+          <div class="usage-meter-bar">
+            <div
+              class={`usage-meter-fill ${usageStats.extractionsThisMonth >= FREE_EXTRACTION_LIMIT ? 'exhausted' : usageStats.extractionsThisMonth >= FREE_EXTRACTION_LIMIT * 0.8 ? 'warning' : ''}`}
+              style={{ width: `${Math.min(100, (usageStats.extractionsThisMonth / FREE_EXTRACTION_LIMIT) * 100)}%` }}
+            />
+          </div>
+        </div>
+      )}
+
       {/* Viewport picker */}
       <ViewportPicker
         selected={selectedViewports}
         customWidths={customWidths}
         onChange={handleViewportChange}
         disabled={state === 'extracting'}
+        tier={tier}
       />
 
       {/* Extract button */}
@@ -385,8 +445,34 @@ function App() {
 
       {/* Footer */}
       <div class="footer">
-        Paste the JSON into the Forge Figma plugin to import.
+        {tier === 'free' ? 'Free tier — basic conversion only' : 'Paste the JSON into the Forge Figma plugin to import.'}
       </div>
+
+      {/* Upgrade modal */}
+      {showUpgradeModal && (
+        <div class="upgrade-modal-overlay" onClick={() => setShowUpgradeModal(false)}>
+          <div class="upgrade-modal" onClick={(e: Event) => e.stopPropagation()}>
+            <div class="upgrade-modal-title">Upgrade to Forge Pro</div>
+            <div class="upgrade-modal-body">
+              {usageStats && isExtractionLimitReached(usageStats)
+                ? `You have used all ${FREE_EXTRACTION_LIMIT} free extractions this month. `
+                : 'Multi-viewport extraction requires a Pro plan. '}
+              Upgrade for unlimited extractions plus design tokens, components, and more.
+            </div>
+            <div class="upgrade-modal-plans">
+              <button class="btn-plan" onClick={() => window.open(STRIPE_CHECKOUT_PRO_URL, '_blank')}>
+                Pro — ${PRICE_PRO_MONTHLY}/mo
+              </button>
+              <button class="btn-plan" onClick={() => window.open(STRIPE_CHECKOUT_TEAM_URL, '_blank')}>
+                Team — ${PRICE_TEAM_PER_SEAT}/seat/mo
+              </button>
+            </div>
+            <button class="btn-dismiss" onClick={() => setShowUpgradeModal(false)}>
+              Maybe later
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

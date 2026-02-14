@@ -17,10 +17,11 @@
  * - Product plan: PRODUCT_PLAN.md
  */
 
-import { UI_WIDTH, UI_HEIGHT } from '../../shared/constants';
+import { UI_WIDTH, UI_HEIGHT, LICENSE_CACHE_MS } from '../../shared/constants';
 import type { UiToSandboxMessage, SandboxToUiMessage } from '../../shared/messages';
-import type { ExtractionResult, ImportSettings } from '../../shared/types';
+import type { ExtractionResult, ImportSettings, LicenseInfo } from '../../shared/types';
 import { DEFAULT_SETTINGS } from '../../shared/types';
+import { isValidLicenseKeyFormat, isLicenseCacheValid, getEffectiveTier, applyTierToSettings } from '../../shared/licensing';
 import { convertToFigma } from './converter';
 import { handleImageDataFromUi } from './nodes/image';
 import { isMultiViewport } from '../../shared/types';
@@ -37,6 +38,21 @@ async function loadSettings(): Promise<ImportSettings> {
 
 async function saveSettings(settings: ImportSettings): Promise<void> {
   await figma.clientStorage.setAsync('forge_settings', settings);
+}
+
+async function loadLicense(): Promise<LicenseInfo | null> {
+  const saved = await figma.clientStorage.getAsync('forge_license');
+  if (!saved) return null;
+  if (!isLicenseCacheValid(saved as LicenseInfo)) return null;
+  return saved as LicenseInfo;
+}
+
+async function saveLicense(license: LicenseInfo): Promise<void> {
+  await figma.clientStorage.setAsync('forge_license', license);
+}
+
+async function clearLicense(): Promise<void> {
+  await figma.clientStorage.deleteAsync('forge_license');
 }
 
 function sendToUi(message: SandboxToUiMessage): void {
@@ -76,6 +92,28 @@ figma.ui.onmessage = async (msg: UiToSandboxMessage & { type: string; nodeId?: s
       );
       break;
 
+    case 'SET_LICENSE': {
+      const key = (msg as UiToSandboxMessage & { type: 'SET_LICENSE' }).key;
+      if (!isValidLicenseKeyFormat(key)) {
+        sendToUi({ type: 'LICENSE_LOADED', license: null, tier: 'free' });
+        break;
+      }
+      const license: LicenseInfo = {
+        key,
+        tier: 'pro',
+        validUntil: Date.now() + LICENSE_CACHE_MS,
+        cachedAt: Date.now(),
+      };
+      await saveLicense(license);
+      sendToUi({ type: 'LICENSE_LOADED', license, tier: 'pro' });
+      break;
+    }
+
+    case 'CLEAR_LICENSE':
+      await clearLicense();
+      sendToUi({ type: 'LICENSE_LOADED', license: null, tier: 'free' });
+      break;
+
     case 'IMAGE_DATA':
       // Image data relayed from UI iframe (fetched from URL)
       handleImageDataFromUi(msg.nodeId ?? '', msg.data ?? null);
@@ -89,12 +127,15 @@ async function handleImport(json: string): Promise<void> {
 
     const parsed = JSON.parse(json);
     const settings = await loadSettings();
+    const license = await loadLicense();
+    const tier = getEffectiveTier(license);
+    const gatedSettings = applyTierToSettings(settings, tier);
 
     if (isMultiViewport(parsed)) {
       // Multi-viewport: create ComponentSet with viewport variants
       const variantResult = await createViewportVariants(
         parsed,
-        settings,
+        gatedSettings,
         (phase, progress, message) => {
           sendToUi({ type: 'IMPORT_PROGRESS', phase, progress, message });
         },
@@ -116,7 +157,7 @@ async function handleImport(json: string): Promise<void> {
     const result: ExtractionResult = parsed;
     const { nodeCount, tokenCount, componentCount, styleCount, sectionCount } = await convertToFigma(
       result,
-      settings,
+      gatedSettings,
       (phase, progress, message) => {
         sendToUi({ type: 'IMPORT_PROGRESS', phase, progress, message });
       },
@@ -200,6 +241,9 @@ async function handleApplyDiff(msg: { changeIds: string[]; mode: 'update-changed
 
     const result: ExtractionResult = JSON.parse(pendingReimportJson);
     const settings = await loadSettings();
+    const license = await loadLicense();
+    const tier = getEffectiveTier(license);
+    const gatedSettings = applyTierToSettings(settings, tier);
 
     // Re-compute diff to get change objects with selection state
     const { changes } = await computeReimportDiff(
@@ -219,7 +263,7 @@ async function handleApplyDiff(msg: { changeIds: string[]; mode: 'update-changed
       selectedChanges,
       result,
       pendingReimportFrame,
-      settings,
+      gatedSettings,
       (phase, progress, message) => {
         sendToUi({ type: 'IMPORT_PROGRESS', phase, progress, message });
       },
@@ -245,4 +289,8 @@ async function handleApplyDiff(msg: { changeIds: string[]; mode: 'update-changed
 (async () => {
   const settings = await loadSettings();
   sendToUi({ type: 'SETTINGS_LOADED', settings });
+
+  const license = await loadLicense();
+  const tier = getEffectiveTier(license);
+  sendToUi({ type: 'LICENSE_LOADED', license, tier });
 })();

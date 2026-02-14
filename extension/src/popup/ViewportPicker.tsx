@@ -12,6 +12,7 @@
 import { h } from 'preact';
 import { useState } from 'preact/hooks';
 import { VIEWPORTS, type ViewportPreset } from '../../../shared/constants';
+import type { Tier } from '../../../shared/types';
 
 /** Presets shown in the picker (excluding laptop to keep it simple). */
 const PICKER_PRESETS: ViewportPreset[] = ['desktop', 'tablet', 'mobile'];
@@ -21,14 +22,20 @@ export interface ViewportPickerProps {
   customWidths: number[];
   onChange: (presets: ViewportPreset[], customWidths: number[]) => void;
   disabled?: boolean;
+  tier?: Tier;
 }
 
-export function ViewportPicker({ selected, customWidths, onChange, disabled }: ViewportPickerProps) {
+export function ViewportPicker({ selected, customWidths, onChange, disabled, tier }: ViewportPickerProps) {
   const [showCustomInput, setShowCustomInput] = useState(false);
   const [customValue, setCustomValue] = useState('');
 
+  const isFree = tier === 'free' || !tier;
+
   const togglePreset = (preset: ViewportPreset) => {
     if (disabled) return;
+
+    // Free tier: only allow single desktop viewport
+    if (isFree && preset !== 'desktop') return;
 
     const isSelected = selected.includes(preset);
     if (isSelected) {
@@ -77,6 +84,9 @@ export function ViewportPicker({ selected, customWidths, onChange, disabled }: V
           >
             {VIEWPORTS[preset].label}
             <span class="viewport-pill-width">{VIEWPORTS[preset].width}</span>
+            {isFree && preset !== 'desktop' && (
+              <span class="pro-badge">PRO</span>
+            )}
           </button>
         ))}
 

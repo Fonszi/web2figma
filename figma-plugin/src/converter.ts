@@ -64,25 +64,30 @@ export async function convertToFigma(
   );
 
   // --- Phase: Detect and create components ---
-  onProgress('creating-components', 0, 'Detecting components...');
-  let detected = detectComponents(result.rootNode);
+  let componentMap: ComponentMap;
+  if (settings.createComponents) {
+    onProgress('creating-components', 0, 'Detecting components...');
+    let detected = detectComponents(result.rootNode);
 
-  // Enhance with Framer component boundaries
-  if (isFramer) {
-    detected = enhanceFramerComponents(detected, result.rootNode);
+    // Enhance with Framer component boundaries
+    if (isFramer) {
+      detected = enhanceFramerComponents(detected, result.rootNode);
+    }
+
+    onProgress('creating-components', 0.3, `Found ${detected.length} component patterns...`);
+
+    componentMap = await createComponents(
+      detected,
+      settings,
+      styleMap,
+      (created, total) => {
+        const progress = 0.3 + (created / total) * 0.7;
+        onProgress('creating-components', progress, `Creating component ${created}/${total}...`);
+      },
+    );
+  } else {
+    componentMap = { nodesByHash: new Map(), count: 0 };
   }
-
-  onProgress('creating-components', 0.3, `Found ${detected.length} component patterns...`);
-
-  const componentMap = await createComponents(
-    detected,
-    settings,
-    styleMap,
-    (created, total) => {
-      const progress = 0.3 + (created / total) * 0.7;
-      onProgress('creating-components', progress, `Creating component ${created}/${total}...`);
-    },
-  );
 
   // Count total nodes for progress tracking
   const totalNodes = countNodes(result.rootNode);
@@ -291,21 +296,26 @@ export async function convertToFigmaAsComponent(
   }
 
   // Detect and create components
-  onProgress('creating-components', 0, 'Detecting components...');
-  let detected = detectComponents(result.rootNode);
-  if (isFramer) {
-    detected = enhanceFramerComponents(detected, result.rootNode);
-  }
+  let componentMap: ComponentMap;
+  if (settings.createComponents) {
+    onProgress('creating-components', 0, 'Detecting components...');
+    let detected = detectComponents(result.rootNode);
+    if (isFramer) {
+      detected = enhanceFramerComponents(detected, result.rootNode);
+    }
 
-  const componentMap = await createComponents(
-    detected,
-    settings,
-    styleMap,
-    (created, total) => {
-      const progress = 0.3 + (created / total) * 0.7;
-      onProgress('creating-components', progress, `Creating component ${created}/${total}...`);
-    },
-  );
+    componentMap = await createComponents(
+      detected,
+      settings,
+      styleMap,
+      (created, total) => {
+        const progress = 0.3 + (created / total) * 0.7;
+        onProgress('creating-components', progress, `Creating component ${created}/${total}...`);
+      },
+    );
+  } else {
+    componentMap = { nodesByHash: new Map(), count: 0 };
+  }
 
   const totalNodes = countNodes(result.rootNode);
   let processedNodes = 0;

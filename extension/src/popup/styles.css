@@ -363,6 +363,130 @@ body {
   padding: 4px 0;
 }
 
+/* Usage meter */
+.usage-meter {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.usage-meter-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.usage-meter-label {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.usage-meter-bar {
+  height: 4px;
+  background: var(--bg-hover);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.usage-meter-fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 2px;
+  transition: width 0.3s;
+}
+
+.usage-meter-fill.warning {
+  background: var(--warning);
+}
+
+.usage-meter-fill.exhausted {
+  background: var(--error);
+}
+
+/* Pro badge */
+.pro-badge {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  background: var(--accent);
+  color: white;
+  padding: 1px 4px;
+  border-radius: 3px;
+  margin-left: 4px;
+  line-height: 1.2;
+}
+
+/* Upgrade modal */
+.upgrade-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+
+.upgrade-modal {
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+  max-width: 300px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.upgrade-modal-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.upgrade-modal-body {
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.upgrade-modal-plans {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.btn-plan {
+  width: 100%;
+  padding: 10px 16px;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  background: rgba(13, 153, 255, 0.1);
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.btn-plan:hover {
+  background: rgba(13, 153, 255, 0.2);
+}
+
+.btn-dismiss {
+  padding: 6px 12px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 12px;
+  cursor: pointer;
+  text-align: center;
+}
+
+.btn-dismiss:hover {
+  color: var(--text-secondary);
+}
+
 /* Footer hint */
 .footer {
   font-size: 11px;
