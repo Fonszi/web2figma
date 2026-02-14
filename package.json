@@ -10,12 +10,14 @@
     "build:plugin": "node esbuild.config.mjs --target=plugin",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
     "lint": "eslint '{extension,figma-plugin,shared}/**/*.{ts,tsx}'",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
     "@figma/plugin-typings": "^1.100.0",
     "@types/chrome": "^0.0.280",
+    "@vitest/coverage-v8": "^2.1.9",
     "esbuild": "^0.24.0",
     "eslint": "^9.15.0",
     "jsdom": "^25.0.0",
