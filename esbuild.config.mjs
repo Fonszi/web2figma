@@ -123,9 +123,15 @@ async function build() {
         resolve(__dirname, 'extension/src/popup/styles.css'),
         resolve(__dirname, 'dist/extension/popup/styles.css')
       );
-      // Create icons directory placeholder
+      // Copy extension icons
       const iconsDir = resolve(__dirname, 'dist/extension/icons');
       if (!existsSync(iconsDir)) mkdirSync(iconsDir, { recursive: true });
+      for (const size of [16, 48, 128]) {
+        copyStatic(
+          resolve(__dirname, `extension/icons/icon-${size}.png`),
+          resolve(__dirname, `dist/extension/icons/icon-${size}.png`)
+        );
+      }
     }
 
     if (target === 'all' || target === 'plugin') {
