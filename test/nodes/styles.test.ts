@@ -37,8 +37,13 @@ describe('parseCssColor', () => {
     expect(c!.a).toBeCloseTo(0.502, 2);
   });
 
+  it('parses hsl colors', () => {
+    const c = parseCssColor('hsl(120, 100%, 50%)');
+    expect(c).not.toBeNull();
+    expect(c!.g).toBeCloseTo(1, 1);
+  });
+
   it('returns null for unsupported formats', () => {
-    expect(parseCssColor('hsl(120, 100%, 50%)')).toBeNull();
     expect(parseCssColor('invalid')).toBeNull();
     expect(parseCssColor('')).toBeNull();
   });

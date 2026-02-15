@@ -127,6 +127,10 @@ async function walkDomNode(element: Element, depth: number): Promise<BridgeNode>
     };
   }
 
+  // Extract pseudo-elements (::before, ::after) as synthetic child nodes
+  extractPseudoElement(element, node, '::before');
+  extractPseudoElement(element, node, '::after');
+
   // Recurse into children (up to MAX_NODE_DEPTH)
   if (depth < MAX_NODE_DEPTH) {
     for (const child of element.children) {
@@ -197,6 +201,61 @@ function extractComputedStyles(cs: CSSStyleDeclaration): ComputedStyles {
     backgroundImage: cs.backgroundImage,
     transform: cs.transform,
   };
+}
+
+/**
+ * Extract a pseudo-element (::before or ::after) and add as a synthetic child node.
+ * Only creates a child if the pseudo-element has visible content.
+ */
+function extractPseudoElement(element: Element, parentNode: BridgeNode, pseudo: '::before' | '::after'): void {
+  const cs = window.getComputedStyle(element, pseudo);
+  const content = cs.content;
+
+  // Skip if no content or content is "none" / empty
+  if (!content || content === 'none' || content === '""' || content === "''") return;
+
+  // Skip invisible pseudo-elements
+  if (cs.display === 'none' || cs.visibility === 'hidden' || cs.opacity === '0') return;
+
+  // Check if it has a background or meaningful visual content
+  const hasBackground = cs.backgroundColor && cs.backgroundColor !== 'rgba(0, 0, 0, 0)' && cs.backgroundColor !== 'transparent';
+  const hasBgImage = cs.backgroundImage && cs.backgroundImage !== 'none';
+  const textContent = content.replace(/^["']|["']$/g, '');
+  const hasText = textContent.length > 0 && textContent !== ' ';
+
+  if (!hasBackground && !hasBgImage && !hasText) return;
+
+  const rect = element.getBoundingClientRect();
+  const pseudoNode: BridgeNode = {
+    tag: pseudo,
+    type: hasText ? 'text' : 'frame',
+    children: [],
+    text: hasText ? textContent : undefined,
+    styles: extractComputedStyles(cs),
+    layout: {
+      isAutoLayout: false,
+      direction: 'none',
+      wrap: false,
+      gap: 0,
+      padding: { top: 0, right: 0, bottom: 0, left: 0 },
+      sizing: { width: 'fixed', height: 'fixed' },
+      mainAxisAlignment: 'start',
+      crossAxisAlignment: 'start',
+    },
+    bounds: {
+      x: rect.x,
+      y: rect.y,
+      width: parseFloat(cs.width) || rect.width,
+      height: parseFloat(cs.height) || rect.height,
+    },
+    visible: true,
+  };
+
+  if (pseudo === '::before') {
+    parentNode.children.unshift(pseudoNode);
+  } else {
+    parentNode.children.push(pseudoNode);
+  }
 }
 
 function extractMetadata(isFramerSite: boolean, framerProjectId?: string): SiteMetadata {

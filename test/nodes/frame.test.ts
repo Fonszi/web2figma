@@ -421,4 +421,60 @@ describe('createFrameNode', () => {
     const frame = createFrameNode(node);
     expect(frame.layoutWrap).toBe('NO_WRAP');
   });
+
+  // --- CSS Gradient Background (#24) ---
+
+  it('applies gradient fill from backgroundImage', () => {
+    const node = makeFrame({
+      styles: { backgroundImage: 'linear-gradient(90deg, rgb(255, 0, 0), rgb(0, 0, 255))' },
+    });
+    const frame = createFrameNode(node);
+    expect(frame.fills).toHaveLength(1);
+    expect((frame.fills as any)[0].type).toBe('GRADIENT_LINEAR');
+  });
+
+  it('falls back to empty fills for unparseable gradient', () => {
+    const node = makeFrame({
+      styles: { backgroundImage: 'gradient(something-invalid)' },
+    });
+    const frame = createFrameNode(node);
+    expect(frame.fills).toEqual([]);
+  });
+
+  it('ignores backgroundImage when not a gradient', () => {
+    const node = makeFrame({
+      styles: { backgroundImage: 'url("image.png")', backgroundColor: 'rgb(255, 0, 0)' },
+    });
+    const frame = createFrameNode(node);
+    // Should use backgroundColor, not backgroundImage
+    expect(frame.fills).toHaveLength(1);
+    expect((frame.fills as any)[0].type).toBe('SOLID');
+  });
+
+  // --- CSS Transform / Rotation (#26) ---
+
+  it('applies rotation from rotate() transform', () => {
+    const node = makeFrame({ styles: { transform: 'rotate(45deg)' } });
+    const frame = createFrameNode(node);
+    expect(frame.rotation).toBe(-45);
+  });
+
+  it('applies rotation from matrix() transform', () => {
+    // matrix for 90deg rotation: matrix(0, 1, -1, 0, 0, 0)
+    const node = makeFrame({ styles: { transform: 'matrix(0, 1, -1, 0, 0, 0)' } });
+    const frame = createFrameNode(node);
+    expect(frame.rotation).toBeCloseTo(-90, 0);
+  });
+
+  it('does not rotate when transform is none', () => {
+    const node = makeFrame({ styles: { transform: 'none' } });
+    const frame = createFrameNode(node);
+    expect(frame.rotation).toBe(0);
+  });
+
+  it('does not rotate when no transform is set', () => {
+    const node = makeFrame();
+    const frame = createFrameNode(node);
+    expect(frame.rotation).toBe(0);
+  });
 });

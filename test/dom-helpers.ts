@@ -53,6 +53,7 @@ export function mockCSSStyles(overrides: Record<string, string> = {}): CSSStyleD
     overflow: 'visible',
     backgroundImage: 'none',
     transform: 'none',
+    gridTemplateColumns: 'none',
   };
 
   const merged = { ...base, ...overrides };

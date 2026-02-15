@@ -91,6 +91,7 @@ export interface MockFrameNode extends PluginDataMixin {
   bottomLeftRadius: number;
   fillStyleId: string;
   effectStyleId: string;
+  rotation: number;
   resize: ReturnType<typeof vi.fn>;
   appendChild: ReturnType<typeof vi.fn>;
   children: unknown[];
@@ -228,6 +229,7 @@ function createMockFrame(): MockFrameNode {
     bottomLeftRadius: 0,
     fillStyleId: '',
     effectStyleId: '',
+    rotation: 0,
     resize: vi.fn(function (this: MockFrameNode, w: number, h: number) {
       this.width = w;
       this.height = h;

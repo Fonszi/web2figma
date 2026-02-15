@@ -95,6 +95,29 @@ describe('analyzeLayout', () => {
       const result = analyzeLayout(el, cs);
       expect(result.isAutoLayout).toBe(true);
     });
+
+    it('maps multi-column grid to horizontal wrapping layout', () => {
+      const cs = mockCSSStyles({ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr' });
+      const result = analyzeLayout(el, cs);
+      expect(result.isAutoLayout).toBe(true);
+      expect(result.direction).toBe('horizontal');
+      expect(result.wrap).toBe(true);
+    });
+
+    it('maps single-column grid to vertical layout', () => {
+      const cs = mockCSSStyles({ display: 'grid', gridTemplateColumns: '1fr' });
+      const result = analyzeLayout(el, cs);
+      expect(result.isAutoLayout).toBe(true);
+      expect(result.direction).toBe('vertical');
+      expect(result.wrap).toBe(false);
+    });
+
+    it('maps grid with pixel columns to horizontal wrapping', () => {
+      const cs = mockCSSStyles({ display: 'grid', gridTemplateColumns: '200px 200px' });
+      const result = analyzeLayout(el, cs);
+      expect(result.direction).toBe('horizontal');
+      expect(result.wrap).toBe(true);
+    });
   });
 
   // --- Wrap ---

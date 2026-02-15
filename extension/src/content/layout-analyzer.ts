@@ -31,9 +31,24 @@ export function analyzeLayout(el: Element, computed: CSSStyleDeclaration): Layou
     };
   }
 
-  const direction = isFlex ? mapFlexDirection(computed.flexDirection) : 'vertical';
-  const wrap = isFlex ? computed.flexWrap === 'wrap' || computed.flexWrap === 'wrap-reverse' : false;
-  const gap = parseFloat(computed.gap) || parseFloat(computed.rowGap) || 0;
+  // Grid layout: approximate as vertical or horizontal based on column count
+  let gridDirection: 'horizontal' | 'vertical' = 'vertical';
+  let gridWrap = false;
+  if (isGrid) {
+    const templateCols = computed.gridTemplateColumns;
+    const colCount = templateCols ? templateCols.split(/\s+/).filter((v: string) => v && v !== 'none').length : 1;
+    if (colCount > 1) {
+      // Multi-column grid → approximate as horizontal wrapping layout
+      gridDirection = 'horizontal';
+      gridWrap = true;
+    }
+  }
+
+  const direction = isFlex ? mapFlexDirection(computed.flexDirection) : gridDirection;
+  const wrap = isFlex
+    ? computed.flexWrap === 'wrap' || computed.flexWrap === 'wrap-reverse'
+    : gridWrap;
+  const gap = parseFloat(computed.gap) || parseFloat(computed.rowGap) || parseFloat(computed.columnGap) || 0;
 
   return {
     isAutoLayout: true,

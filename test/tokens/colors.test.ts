@@ -55,7 +55,7 @@ describe('createColorStyles', () => {
 
   it('skips unparseable colors', async () => {
     const tokens: ColorToken[] = [
-      { name: 'a', value: 'hsl(120, 100%, 50%)', usageCount: 5 },
+      { name: 'a', value: 'not-a-color', usageCount: 5 },
       { name: 'b', value: 'rgb(0, 0, 255)', usageCount: 3 },
     ];
 
@@ -63,6 +63,18 @@ describe('createColorStyles', () => {
 
     expect(result.count).toBe(1);
     expect(mockStore.paintStyles).toHaveLength(1);
+  });
+
+  it('parses hsl colors', async () => {
+    const tokens: ColorToken[] = [
+      { name: 'a', value: 'hsl(120, 100%, 50%)', usageCount: 5 },
+      { name: 'b', value: 'rgb(0, 0, 255)', usageCount: 3 },
+    ];
+
+    const result = await createColorStyles(tokens);
+
+    expect(result.count).toBe(2);
+    expect(mockStore.paintStyles).toHaveLength(2);
   });
 
   it('returns empty map for empty tokens', async () => {

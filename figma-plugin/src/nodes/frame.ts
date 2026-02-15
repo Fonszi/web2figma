@@ -12,7 +12,7 @@
 
 import type { BridgeNode } from '../../../shared/types';
 import type { StyleMap } from '../tokens';
-import { parseCssColor, isTransparent, solidPaint, parseCornerRadii, parseBoxShadow } from './styles';
+import { parseCssColor, isTransparent, solidPaint, parseCornerRadii, parseBoxShadow, gradientPaint } from './styles';
 
 export function createFrameNode(node: BridgeNode, styleMap?: StyleMap, framerName?: string | null): FrameNode {
   const frame = figma.createFrame();
@@ -24,8 +24,16 @@ export function createFrameNode(node: BridgeNode, styleMap?: StyleMap, framerNam
     Math.max(1, Math.round(node.bounds.height)),
   );
 
-  // Background — link to PaintStyle if available, else raw paint
-  if (node.styles.backgroundColor && !isTransparent(node.styles.backgroundColor)) {
+  // Background — gradient, solid, or empty
+  const bgImage = node.styles.backgroundImage;
+  if (bgImage && bgImage.includes('gradient(')) {
+    const gradient = gradientPaint(bgImage);
+    if (gradient) {
+      frame.fills = [gradient];
+    } else {
+      frame.fills = [];
+    }
+  } else if (node.styles.backgroundColor && !isTransparent(node.styles.backgroundColor)) {
     const normalized = node.styles.backgroundColor.trim().toLowerCase();
     const colorStyleId = styleMap?.colors.byValue.get(normalized);
     if (colorStyleId) {
@@ -68,6 +76,11 @@ export function createFrameNode(node: BridgeNode, styleMap?: StyleMap, framerNam
       const shadow = parseBoxShadow(node.styles.boxShadow);
       if (shadow) frame.effects = [shadow];
     }
+  }
+
+  // CSS Transform → rotation
+  if (node.styles.transform && node.styles.transform !== 'none') {
+    applyTransform(frame, node.styles.transform);
   }
 
   // Clips content
@@ -130,6 +143,27 @@ function applyAutoLayout(frame: FrameNode, node: BridgeNode): void {
   // Wrap
   if (node.layout.wrap) {
     frame.layoutWrap = 'WRAP';
+  }
+}
+
+/** Parse CSS transform matrix/rotate and apply rotation to the frame. */
+function applyTransform(frame: FrameNode, transform: string): void {
+  // Try rotate() first: e.g. "rotate(45deg)"
+  const rotateMatch = transform.match(/rotate\(\s*(-?[\d.]+)deg\s*\)/);
+  if (rotateMatch) {
+    frame.rotation = -parseFloat(rotateMatch[1]); // Figma uses counter-clockwise
+    return;
+  }
+
+  // Try matrix(): extract rotation from 2D matrix(a, b, c, d, tx, ty)
+  const matrixMatch = transform.match(/matrix\(\s*(-?[\d.]+)\s*,\s*(-?[\d.]+)/);
+  if (matrixMatch) {
+    const a = parseFloat(matrixMatch[1]);
+    const b = parseFloat(matrixMatch[2]);
+    const angleDeg = Math.atan2(b, a) * (180 / Math.PI);
+    if (Math.abs(angleDeg) > 0.01) {
+      frame.rotation = -angleDeg; // Figma uses counter-clockwise
+    }
   }
 }
 

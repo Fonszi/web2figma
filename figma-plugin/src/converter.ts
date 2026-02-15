@@ -26,6 +26,7 @@ import { createFrameNode } from './nodes/frame';
 import { createTextNode } from './nodes/text';
 import { createImageNode } from './nodes/image';
 import { createVectorNode } from './nodes/vector';
+import { createInputNode } from './nodes/input';
 import { createAllStyles, type StyleMap } from './tokens';
 import { detectComponents, createComponents, createInstanceNode, type ComponentMap } from './components';
 import { enhanceFramerTokens, enhanceFramerComponents, getFramerName, organizeFramerSections } from './framer';
@@ -214,8 +215,12 @@ async function convertNode(
       break;
     }
 
+    case 'input': {
+      figmaNode = await createInputNode(node, styleMap, framerName);
+      break;
+    }
+
     case 'frame':
-    case 'input':
     case 'video':
     case 'unknown':
     default: {
