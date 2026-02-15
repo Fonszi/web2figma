@@ -208,7 +208,12 @@ function extractComputedStyles(cs: CSSStyleDeclaration): ComputedStyles {
  * Only creates a child if the pseudo-element has visible content.
  */
 function extractPseudoElement(element: Element, parentNode: BridgeNode, pseudo: '::before' | '::after'): void {
-  const cs = window.getComputedStyle(element, pseudo);
+  let cs: CSSStyleDeclaration;
+  try {
+    cs = window.getComputedStyle(element, pseudo);
+  } catch {
+    return; // Not supported in test environments (jsdom)
+  }
   const content = cs.content;
 
   // Skip if no content or content is "none" / empty
