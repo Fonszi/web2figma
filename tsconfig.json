@@ -21,7 +21,8 @@
     "paths": {
       "@shared/*": ["src/shared/*"],
       "@plugin/*": ["src/plugin/*"],
-      "@ui/*": ["src/ui/*"]
+      "@ui/*": ["src/ui/*"],
+      "@conversion-core/*": ["src/shared/figma-conversion-core/src/*"]
     }
   },
   "include": ["src/**/*.ts", "src/**/*.tsx"],

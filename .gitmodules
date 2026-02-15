@@ -1,0 +1,3 @@
+[submodule "src/shared/figma-conversion-core"]
+	path = src/shared/figma-conversion-core
+	url = https://github.com/Fonszi/figma-conversion-core.git
