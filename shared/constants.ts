@@ -33,6 +33,24 @@ export const STORAGE_KEY_SETTINGS = 'forge_settings';
 export const STORAGE_KEY_USAGE = 'forge_usage';
 export const STORAGE_KEY_SELECTED_VIEWPORTS = 'forge_selected_viewports';
 
+/** Figma clientStorage key for personal presets. */
+export const STORAGE_KEY_PRESETS = 'forge_presets';
+
+/** SharedPluginData namespace for all Forge team data. */
+export const SHARED_PLUGIN_NAMESPACE = 'forge';
+
+/** SharedPluginData keys (within 'forge' namespace). */
+export const SHARED_KEY_TEAM_PRESETS = 'team_presets';
+export const SHARED_KEY_STYLE_REGISTRY = 'style_registry';
+export const SHARED_KEY_TEAM_DEFAULTS = 'team_defaults';
+
+/** Maximum preset counts. */
+export const MAX_PERSONAL_PRESETS = 20;
+export const MAX_TEAM_PRESETS = 50;
+
+/** Maximum style registry entries per file. */
+export const MAX_STYLE_REGISTRY_ENTRIES = 500;
+
 /** Viewport preset keys for multi-viewport extraction. */
 export type ViewportPreset = keyof typeof VIEWPORTS;
 
@@ -96,4 +114,13 @@ export const PRO_FEATURES: readonly string[] = [
   'components',
   'framer-aware',
   'variables',
+] as const;
+
+/** Team-only features. Team tier includes all Pro features plus these. */
+export type TeamFeature = 'shared-presets' | 'team-defaults' | 'style-registry';
+
+export const TEAM_FEATURES: readonly TeamFeature[] = [
+  'shared-presets',
+  'team-defaults',
+  'style-registry',
 ] as const;

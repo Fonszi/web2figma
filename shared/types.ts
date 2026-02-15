@@ -260,3 +260,41 @@ export interface UsageStats {
   monthKey: string;          // "YYYY-MM" format for calendar month reset
   lastExtractionAt: number;  // Unix timestamp (ms)
 }
+
+// ============================================================
+// Team Features — Presets, Style Registry, Team Defaults
+// ============================================================
+
+/** A named, shareable combination of ImportSettings + viewport configuration. */
+export interface Preset {
+  id: string;
+  name: string;
+  settings: ImportSettings;
+  viewports: { presets: string[]; customWidths: number[] };
+  createdBy: string;
+  createdAt: number;
+  isTeamPreset: boolean;
+}
+
+/** Tracks a Figma style created by Forge for dedup / provenance. */
+export interface StyleRegistryEntry {
+  figmaStyleId: string;
+  styleName: string;
+  styleType: 'color' | 'typography' | 'effect' | 'variable';
+  sourceUrl: string;
+  createdAt: number;
+  createdBy: string;
+}
+
+/** Registry of all Forge-created styles in the current file. */
+export interface StyleRegistry {
+  entries: StyleRegistryEntry[];
+  lastUpdatedAt: number;
+}
+
+/** Team-level default settings stored per-file via sharedPluginData. */
+export interface TeamDefaults {
+  settings: ImportSettings;
+  setBy: string;
+  setAt: number;
+}

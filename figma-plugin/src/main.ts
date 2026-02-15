@@ -17,12 +17,14 @@
  * - Product plan: PRODUCT_PLAN.md
  */
 
-import { UI_WIDTH, UI_HEIGHT, LICENSE_CACHE_MS } from '../../shared/constants';
+import { UI_WIDTH, UI_HEIGHT, LICENSE_CACHE_MS, STORAGE_KEY_PRESETS, SHARED_PLUGIN_NAMESPACE, SHARED_KEY_TEAM_PRESETS, SHARED_KEY_STYLE_REGISTRY, SHARED_KEY_TEAM_DEFAULTS, MAX_PERSONAL_PRESETS, MAX_TEAM_PRESETS } from '../../shared/constants';
 import type { UiToSandboxMessage, SandboxToUiMessage } from '../../shared/messages';
-import type { ExtractionResult, ImportSettings, LicenseInfo } from '../../shared/types';
+import type { ExtractionResult, ImportSettings, LicenseInfo, Preset, StyleRegistry, TeamDefaults } from '../../shared/types';
 import { DEFAULT_SETTINGS } from '../../shared/types';
-import { isValidLicenseKeyFormat, isLicenseCacheValid, getEffectiveTier, applyTierToSettings } from '../../shared/licensing';
+import { isValidLicenseKeyFormat, isLicenseCacheValid, getEffectiveTier, applyTierToSettings, hasTeamAccess } from '../../shared/licensing';
 import { activateLicense, logConversion } from '../../shared/api-client';
+import { addPreset, removePreset, promoteToTeamPreset, demoteToPersonalPreset } from '../../shared/presets';
+import { deserializeRegistry } from '../../shared/style-registry';
 import { convertToFigma } from './converter';
 import { handleImageDataFromUi } from './nodes/image';
 import { isMultiViewport } from '../../shared/types';
@@ -54,6 +56,60 @@ async function saveLicense(license: LicenseInfo): Promise<void> {
 
 async function clearLicense(): Promise<void> {
   await figma.clientStorage.deleteAsync('forge_license');
+}
+
+// --- Preset storage ---
+
+async function loadPersonalPresets(): Promise<Preset[]> {
+  const saved = await figma.clientStorage.getAsync(STORAGE_KEY_PRESETS);
+  return Array.isArray(saved) ? saved : [];
+}
+
+async function savePersonalPresets(presets: Preset[]): Promise<void> {
+  await figma.clientStorage.setAsync(STORAGE_KEY_PRESETS, presets);
+}
+
+function loadTeamPresets(): Preset[] {
+  const json = figma.root.getSharedPluginData(SHARED_PLUGIN_NAMESPACE, SHARED_KEY_TEAM_PRESETS);
+  if (!json) return [];
+  try {
+    const parsed = JSON.parse(json);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveTeamPresets(presets: Preset[]): void {
+  figma.root.setSharedPluginData(SHARED_PLUGIN_NAMESPACE, SHARED_KEY_TEAM_PRESETS, JSON.stringify(presets));
+}
+
+// --- Style registry storage ---
+
+function loadStyleRegistry(): StyleRegistry | null {
+  const json = figma.root.getSharedPluginData(SHARED_PLUGIN_NAMESPACE, SHARED_KEY_STYLE_REGISTRY);
+  if (!json) return null;
+  return deserializeRegistry(json);
+}
+
+// --- Team defaults storage ---
+
+function loadTeamDefaults(): TeamDefaults | null {
+  const json = figma.root.getSharedPluginData(SHARED_PLUGIN_NAMESPACE, SHARED_KEY_TEAM_DEFAULTS);
+  if (!json) return null;
+  try {
+    return JSON.parse(json) as TeamDefaults;
+  } catch {
+    return null;
+  }
+}
+
+function saveTeamDefaults(defaults: TeamDefaults): void {
+  figma.root.setSharedPluginData(SHARED_PLUGIN_NAMESPACE, SHARED_KEY_TEAM_DEFAULTS, JSON.stringify(defaults));
+}
+
+function clearStoredTeamDefaults(): void {
+  figma.root.setSharedPluginData(SHARED_PLUGIN_NAMESPACE, SHARED_KEY_TEAM_DEFAULTS, '');
 }
 
 function sendToUi(message: SandboxToUiMessage): void {
@@ -125,6 +181,129 @@ figma.ui.onmessage = async (msg: UiToSandboxMessage & { type: string; nodeId?: s
       // Image data relayed from UI iframe (fetched from URL)
       handleImageDataFromUi(msg.nodeId ?? '', msg.data ?? null);
       break;
+
+    // --- Preset handlers ---
+
+    case 'LOAD_PRESETS': {
+      const personal = await loadPersonalPresets();
+      const team = loadTeamPresets();
+      sendToUi({ type: 'PRESETS_LOADED', personal, team });
+      break;
+    }
+
+    case 'SAVE_PRESET': {
+      const newPreset = { ...(msg as UiToSandboxMessage & { type: 'SAVE_PRESET' }).preset };
+      if (newPreset.isTeamPreset) {
+        const license = await loadLicense();
+        const tier = getEffectiveTier(license);
+        if (!hasTeamAccess(tier)) {
+          newPreset.isTeamPreset = false;
+        }
+      }
+      if (newPreset.isTeamPreset) {
+        const team = loadTeamPresets();
+        saveTeamPresets(addPreset(team, newPreset, MAX_TEAM_PRESETS));
+      } else {
+        const personal = await loadPersonalPresets();
+        await savePersonalPresets(addPreset(personal, newPreset, MAX_PERSONAL_PRESETS));
+      }
+      sendToUi({ type: 'PRESET_SAVED', preset: newPreset });
+      sendToUi({ type: 'PRESETS_LOADED', personal: await loadPersonalPresets(), team: loadTeamPresets() });
+      break;
+    }
+
+    case 'DELETE_PRESET': {
+      const { presetId, isTeamPreset: isTeam } = msg as UiToSandboxMessage & { type: 'DELETE_PRESET' };
+      if (isTeam) {
+        saveTeamPresets(removePreset(loadTeamPresets(), presetId));
+      } else {
+        const personal = await loadPersonalPresets();
+        await savePersonalPresets(removePreset(personal, presetId));
+      }
+      sendToUi({ type: 'PRESET_DELETED', presetId });
+      sendToUi({ type: 'PRESETS_LOADED', personal: await loadPersonalPresets(), team: loadTeamPresets() });
+      break;
+    }
+
+    case 'SHARE_PRESET': {
+      const { presetId } = msg as UiToSandboxMessage & { type: 'SHARE_PRESET' };
+      const license = await loadLicense();
+      const tier = getEffectiveTier(license);
+      if (!hasTeamAccess(tier)) break;
+
+      const personal = await loadPersonalPresets();
+      const found = personal.find((p) => p.id === presetId);
+      if (!found) break;
+
+      const teamPreset = promoteToTeamPreset(found);
+      saveTeamPresets(addPreset(loadTeamPresets(), teamPreset, MAX_TEAM_PRESETS));
+      await savePersonalPresets(removePreset(personal, presetId));
+
+      sendToUi({ type: 'PRESET_SHARED', preset: teamPreset });
+      sendToUi({ type: 'PRESETS_LOADED', personal: await loadPersonalPresets(), team: loadTeamPresets() });
+      break;
+    }
+
+    case 'UNSHARE_PRESET': {
+      const { presetId } = msg as UiToSandboxMessage & { type: 'UNSHARE_PRESET' };
+      const team = loadTeamPresets();
+      const found = team.find((p) => p.id === presetId);
+      if (!found) break;
+
+      const personalPreset = demoteToPersonalPreset(found);
+      saveTeamPresets(removePreset(team, presetId));
+      const personal = await loadPersonalPresets();
+      await savePersonalPresets(addPreset(personal, personalPreset, MAX_PERSONAL_PRESETS));
+
+      sendToUi({ type: 'PRESET_UNSHARED', presetId });
+      sendToUi({ type: 'PRESETS_LOADED', personal: await loadPersonalPresets(), team: loadTeamPresets() });
+      break;
+    }
+
+    case 'APPLY_PRESET': {
+      const preset = (msg as UiToSandboxMessage & { type: 'APPLY_PRESET' }).preset;
+      await saveSettings(preset.settings);
+      sendToUi({ type: 'SETTINGS_LOADED', settings: preset.settings });
+      break;
+    }
+
+    // --- Style registry handlers ---
+
+    case 'LOAD_STYLE_REGISTRY': {
+      const registry = loadStyleRegistry();
+      sendToUi({ type: 'STYLE_REGISTRY_LOADED', registry });
+      break;
+    }
+
+    // --- Team defaults handlers ---
+
+    case 'LOAD_TEAM_DEFAULTS': {
+      const defaults = loadTeamDefaults();
+      sendToUi({ type: 'TEAM_DEFAULTS_LOADED', defaults });
+      break;
+    }
+
+    case 'SET_TEAM_DEFAULTS': {
+      const license = await loadLicense();
+      const tier = getEffectiveTier(license);
+      if (!hasTeamAccess(tier)) break;
+
+      const settingsForDefaults = (msg as UiToSandboxMessage & { type: 'SET_TEAM_DEFAULTS' }).settings;
+      const defaults: TeamDefaults = {
+        settings: settingsForDefaults,
+        setBy: license?.key?.slice(0, 10) ?? 'unknown',
+        setAt: Date.now(),
+      };
+      saveTeamDefaults(defaults);
+      sendToUi({ type: 'TEAM_DEFAULTS_SAVED', defaults });
+      break;
+    }
+
+    case 'CLEAR_TEAM_DEFAULTS': {
+      clearStoredTeamDefaults();
+      sendToUi({ type: 'TEAM_DEFAULTS_CLEARED' });
+      break;
+    }
   }
 };
 
@@ -320,10 +499,25 @@ function logConversionAfterImport(
 
 // Initialize
 (async () => {
-  const settings = await loadSettings();
-  sendToUi({ type: 'SETTINGS_LOADED', settings });
-
+  let settings = await loadSettings();
   const license = await loadLicense();
   const tier = getEffectiveTier(license);
+
+  // Apply team defaults on first load (if no personal settings saved)
+  const savedSettings = await figma.clientStorage.getAsync('forge_settings');
+  if (!savedSettings) {
+    const teamDefaults = loadTeamDefaults();
+    if (teamDefaults) {
+      settings = teamDefaults.settings;
+      await saveSettings(settings);
+    }
+  }
+
+  sendToUi({ type: 'SETTINGS_LOADED', settings });
   sendToUi({ type: 'LICENSE_LOADED', license, tier });
+
+  // Preload presets
+  const personal = await loadPersonalPresets();
+  const team = loadTeamPresets();
+  sendToUi({ type: 'PRESETS_LOADED', personal, team });
 })();

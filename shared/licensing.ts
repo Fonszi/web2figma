@@ -6,7 +6,8 @@
 // Used by: extension popup, service worker, plugin sandbox, plugin UI.
 // ============================================================
 
-import { FREE_EXTRACTION_LIMIT, LICENSE_KEY_REGEX, LICENSE_CACHE_MS, PRO_FEATURES } from './constants';
+import { FREE_EXTRACTION_LIMIT, LICENSE_KEY_REGEX, LICENSE_CACHE_MS, PRO_FEATURES, TEAM_FEATURES } from './constants';
+import type { TeamFeature } from './constants';
 import type { Tier, LicenseInfo, UsageStats, ProFeature, ImportSettings } from './types';
 import { simpleHash } from './diffing';
 
@@ -133,4 +134,15 @@ export function applyTierToSettings(settings: ImportSettings, tier: Tier): Impor
     createVariables: false,
     framerAwareMode: false,
   };
+}
+
+/** Check if the current tier has team access. */
+export function hasTeamAccess(tier: Tier): boolean {
+  return tier === 'team';
+}
+
+/** Check if the current tier has access to a specific team feature. */
+export function hasTeamFeatureAccess(tier: Tier, feature: TeamFeature): boolean {
+  if (tier === 'team') return true;
+  return !TEAM_FEATURES.includes(feature);
 }

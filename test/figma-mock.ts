@@ -475,6 +475,30 @@ export function setupFigmaMock(): void {
       children: [] as unknown[],
     },
 
+    root: {
+      _sharedData: {} as Record<string, Record<string, string>>,
+      setSharedPluginData: vi.fn(function (
+        this: { _sharedData: Record<string, Record<string, string>> },
+        namespace: string,
+        key: string,
+        value: string,
+      ) {
+        if (!this._sharedData[namespace]) this._sharedData[namespace] = {};
+        if (value === '') {
+          delete this._sharedData[namespace][key];
+        } else {
+          this._sharedData[namespace][key] = value;
+        }
+      }),
+      getSharedPluginData: vi.fn(function (
+        this: { _sharedData: Record<string, Record<string, string>> },
+        namespace: string,
+        key: string,
+      ): string {
+        return this._sharedData[namespace]?.[key] ?? '';
+      }),
+    },
+
     ui: {
       postMessage: vi.fn(),
     },
@@ -497,6 +521,10 @@ export function setupFigmaMock(): void {
   figmaMock.clientStorage.getAsync = figmaMock.clientStorage.getAsync.bind(figmaMock.clientStorage);
   figmaMock.clientStorage.setAsync = figmaMock.clientStorage.setAsync.bind(figmaMock.clientStorage);
   figmaMock.clientStorage.deleteAsync = figmaMock.clientStorage.deleteAsync.bind(figmaMock.clientStorage);
+
+  // Bind root sharedPluginData methods
+  figmaMock.root.setSharedPluginData = figmaMock.root.setSharedPluginData.bind(figmaMock.root);
+  figmaMock.root.getSharedPluginData = figmaMock.root.getSharedPluginData.bind(figmaMock.root);
 
   (globalThis as Record<string, unknown>).figma = figmaMock;
 }

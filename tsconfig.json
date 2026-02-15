@@ -26,5 +26,5 @@
     }
   },
   "include": ["src/**/*.ts", "src/**/*.tsx"],
-  "exclude": ["node_modules", "dist", "backend"]
+  "exclude": ["node_modules", "dist", "backend", "src/shared/figma-conversion-core/__tests__"]
 }

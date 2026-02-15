@@ -15,13 +15,16 @@ import { render } from 'preact';
 import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
 import type { SandboxToUiMessage, ImportPhase, DiffChange, DiffSummary } from '../../../shared/messages';
 import { PHASE_LABELS } from '../../../shared/messages';
-import type { ImportSettings, ExtractionResult, LicenseInfo, Tier } from '../../../shared/types';
+import type { ImportSettings, ExtractionResult, LicenseInfo, Tier, Preset, StyleRegistry } from '../../../shared/types';
 import { DEFAULT_SETTINGS } from '../../../shared/types';
 import { getEffectiveTier, isValidLicenseKeyFormat } from '../../../shared/licensing';
 import { checkRelayHealth, fetchExtraction } from '../../../shared/relay-client';
+import { createPreset } from '../../../shared/presets';
 import { TokenPanel } from './components/TokenPanel';
 import { ComponentPanel } from './components/ComponentPanel';
 import { DiffPanel } from './components/DiffPanel';
+import { PresetPanel } from './components/PresetPanel';
+import { StyleRegistryPanel } from './components/StyleRegistryPanel';
 
 type UiState = 'idle' | 'importing' | 'done' | 'error' | 'diff-review';
 
@@ -42,6 +45,9 @@ function App() {
   const [showLicenseInput, setShowLicenseInput] = useState(false);
   const [licenseKeyInput, setLicenseKeyInput] = useState('');
   const [licenseError, setLicenseError] = useState<string | null>(null);
+  const [personalPresets, setPersonalPresets] = useState<Preset[]>([]);
+  const [teamPresets, setTeamPresets] = useState<Preset[]>([]);
+  const [styleRegistry, setStyleRegistry] = useState<StyleRegistry | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const tier: Tier = getEffectiveTier(license);
@@ -93,6 +99,25 @@ function App() {
 
         case 'LICENSE_LOADED':
           setLicense(msg.license);
+          break;
+
+        case 'PRESETS_LOADED':
+          setPersonalPresets(msg.personal);
+          setTeamPresets(msg.team);
+          break;
+
+        case 'STYLE_REGISTRY_LOADED':
+          setStyleRegistry(msg.registry);
+          break;
+
+        case 'PRESET_SAVED':
+        case 'PRESET_DELETED':
+        case 'PRESET_SHARED':
+        case 'PRESET_UNSHARED':
+        case 'TEAM_DEFAULTS_LOADED':
+        case 'TEAM_DEFAULTS_SAVED':
+        case 'TEAM_DEFAULTS_CLEARED':
+          // State refreshed via PRESETS_LOADED after each mutation
           break;
       }
     };
@@ -212,6 +237,27 @@ function App() {
     parent.postMessage({ pluginMessage: { type: 'CLEAR_LICENSE' } }, '*');
   }, []);
 
+  const handleApplyPreset = useCallback((preset: Preset) => {
+    parent.postMessage({ pluginMessage: { type: 'APPLY_PRESET', preset } }, '*');
+  }, []);
+
+  const handleSavePreset = useCallback((name: string, isTeam: boolean) => {
+    const preset = createPreset(name, settings, { presets: ['desktop'], customWidths: [] }, 'user', isTeam);
+    parent.postMessage({ pluginMessage: { type: 'SAVE_PRESET', preset } }, '*');
+  }, [settings]);
+
+  const handleDeletePreset = useCallback((presetId: string, isTeamPreset: boolean) => {
+    parent.postMessage({ pluginMessage: { type: 'DELETE_PRESET', presetId, isTeamPreset } }, '*');
+  }, []);
+
+  const handleSharePreset = useCallback((presetId: string) => {
+    parent.postMessage({ pluginMessage: { type: 'SHARE_PRESET', presetId } }, '*');
+  }, []);
+
+  const handleUnsharePreset = useCallback((presetId: string) => {
+    parent.postMessage({ pluginMessage: { type: 'UNSHARE_PRESET', presetId } }, '*');
+  }, []);
+
   const isValidJson = json.trim().length > 0 && (() => {
     try { JSON.parse(json); return true; } catch { return false; }
   })();
@@ -265,6 +311,23 @@ function App() {
             </div>
           )}
         </div>
+      )}
+
+      {/* Presets and style registry (idle only) */}
+      {state === 'idle' && (
+        <>
+          <PresetPanel
+            personalPresets={personalPresets}
+            teamPresets={teamPresets}
+            tier={tier}
+            onApplyPreset={handleApplyPreset}
+            onSavePreset={handleSavePreset}
+            onDeletePreset={handleDeletePreset}
+            onSharePreset={handleSharePreset}
+            onUnsharePreset={handleUnsharePreset}
+          />
+          <StyleRegistryPanel registry={styleRegistry} />
+        </>
       )}
 
       {/* Idle: JSON input */}

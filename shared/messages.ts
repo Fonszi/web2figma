@@ -11,7 +11,7 @@
 //   Used in: extension/src/popup/Popup.tsx, extension/src/background/service-worker.ts
 // ============================================================
 
-import type { ExtractionResult, ImportSettings, LicenseInfo, Tier } from './types';
+import type { ExtractionResult, ImportSettings, LicenseInfo, Tier, Preset, StyleRegistry, TeamDefaults } from './types';
 
 // --- Channel 1: Figma Plugin UI ↔ Sandbox ---
 
@@ -23,7 +23,20 @@ export type UiToSandboxMessage =
   | { type: 'UPDATE_SETTINGS'; settings: Partial<ImportSettings> }
   | { type: 'RESIZE_UI'; width: number; height: number }
   | { type: 'SET_LICENSE'; key: string }
-  | { type: 'CLEAR_LICENSE' };
+  | { type: 'CLEAR_LICENSE' }
+  // --- Preset messages ---
+  | { type: 'LOAD_PRESETS' }
+  | { type: 'SAVE_PRESET'; preset: Preset }
+  | { type: 'DELETE_PRESET'; presetId: string; isTeamPreset: boolean }
+  | { type: 'SHARE_PRESET'; presetId: string }
+  | { type: 'UNSHARE_PRESET'; presetId: string }
+  | { type: 'APPLY_PRESET'; preset: Preset }
+  // --- Style registry messages ---
+  | { type: 'LOAD_STYLE_REGISTRY' }
+  // --- Team defaults messages ---
+  | { type: 'LOAD_TEAM_DEFAULTS' }
+  | { type: 'SET_TEAM_DEFAULTS'; settings: ImportSettings }
+  | { type: 'CLEAR_TEAM_DEFAULTS' };
 
 export type SandboxToUiMessage =
   | { type: 'IMPORT_PROGRESS'; phase: ImportPhase; progress: number; message: string }
@@ -32,7 +45,19 @@ export type SandboxToUiMessage =
   | { type: 'SETTINGS_LOADED'; settings: ImportSettings }
   | { type: 'DIFF_RESULT'; changes: DiffChange[]; summary: DiffSummary }
   | { type: 'REIMPORT_COMPLETE'; updatedCount: number; addedCount: number; removedCount: number }
-  | { type: 'LICENSE_LOADED'; license: LicenseInfo | null; tier: Tier };
+  | { type: 'LICENSE_LOADED'; license: LicenseInfo | null; tier: Tier }
+  // --- Preset responses ---
+  | { type: 'PRESETS_LOADED'; personal: Preset[]; team: Preset[] }
+  | { type: 'PRESET_SAVED'; preset: Preset }
+  | { type: 'PRESET_DELETED'; presetId: string }
+  | { type: 'PRESET_SHARED'; preset: Preset }
+  | { type: 'PRESET_UNSHARED'; presetId: string }
+  // --- Style registry responses ---
+  | { type: 'STYLE_REGISTRY_LOADED'; registry: StyleRegistry | null }
+  // --- Team defaults responses ---
+  | { type: 'TEAM_DEFAULTS_LOADED'; defaults: TeamDefaults | null }
+  | { type: 'TEAM_DEFAULTS_SAVED'; defaults: TeamDefaults }
+  | { type: 'TEAM_DEFAULTS_CLEARED' };
 
 export type ImportPhase =
   | 'parsing'
